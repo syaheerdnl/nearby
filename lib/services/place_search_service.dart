@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../core/constants.dart';
@@ -41,7 +42,12 @@ class PlaceSearchService {
         'bias': 'proximity:${lng.toStringAsFixed(5)},${lat.toStringAsFixed(5)}',
       'apiKey': Env.geoapifyKey,
     });
-    final body = await _getJson(uri);
+    return parseGeoapify(await _getJson(uri));
+  }
+
+  /// Geoapify Autocomplete (format=json) body -> results.
+  @visibleForTesting
+  static List<PlaceResult> parseGeoapify(Map<String, dynamic> body) {
     final results = (body['results'] as List?) ?? const [];
     final out = <PlaceResult>[];
     for (final r in results.whereType<Map<String, dynamic>>()) {
@@ -78,7 +84,12 @@ class PlaceSearchService {
         'lon': nearLng.toStringAsFixed(5),
       },
     });
-    final body = await _getJson(uri);
+    return parsePhoton(await _getJson(uri));
+  }
+
+  /// Photon GeoJSON body -> results.
+  @visibleForTesting
+  static List<PlaceResult> parsePhoton(Map<String, dynamic> body) {
     final features = (body['features'] as List?) ?? const [];
     return features
         .whereType<Map<String, dynamic>>()
@@ -101,7 +112,7 @@ class PlaceSearchService {
     }
   }
 
-  PlaceResult? _toResult(Map<String, dynamic> feature) {
+  static PlaceResult? _toResult(Map<String, dynamic> feature) {
     final coords = (feature['geometry'] as Map?)?['coordinates'] as List?;
     final props = (feature['properties'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};

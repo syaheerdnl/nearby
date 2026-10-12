@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
@@ -120,7 +121,7 @@ class RoutingService {
     final f = features.first as Map<String, dynamic>;
     final props = (f['properties'] as Map?)?.cast<String, dynamic>() ?? {};
     return RouteResult(
-      path: _flattenLonLat((f['geometry'] as Map?)?['coordinates']),
+      path: flattenLonLat((f['geometry'] as Map?)?['coordinates']),
       distanceMeters: (props['distance'] as num? ?? 0).toDouble(),
       durationSeconds: (props['time'] as num? ?? 0).toDouble(),
       order: order ?? List<int>.generate(stops.length, (i) => i),
@@ -176,15 +177,16 @@ class RoutingService {
       }
     }
     final order = stops.length <= _exactOrderLimit
-        ? _exactOrder(cost)
-        : _greedyOrder(cost);
+        ? exactOrder(cost)
+        : greedyOrder(cost);
     final ordered = [for (final i in order) stops[i]];
     return _geoapifyRoute(start, ordered, order: order);
   }
 
   /// Held-Karp over stops 1..n-1 (index 0 is the start), open path.
   /// Returns stop indexes (0-based into stops) in visiting order.
-  static List<int> _exactOrder(List<List<double>> cost) {
+  @visibleForTesting
+  static List<int> exactOrder(List<List<double>> cost) {
     final m = cost.length - 1; // number of stops
     final full = 1 << m;
     final dp = List.generate(full, (_) => List<double>.filled(m, double.infinity));
@@ -224,7 +226,8 @@ class RoutingService {
   }
 
   /// Nearest unvisited stop each time. Used only for very long trips.
-  static List<int> _greedyOrder(List<List<double>> cost) {
+  @visibleForTesting
+  static List<int> greedyOrder(List<List<double>> cost) {
     final m = cost.length - 1;
     final left = {for (var k = 0; k < m; k++) k};
     final order = <int>[];
@@ -254,7 +257,8 @@ class RoutingService {
   }
 
   /// GeoJSON LineString / MultiLineString coordinates ([lon, lat]) -> points.
-  static List<LatLng> _flattenLonLat(Object? coords) {
+  @visibleForTesting
+  static List<LatLng> flattenLonLat(Object? coords) {
     final out = <LatLng>[];
     void walk(Object? node) {
       if (node is! List || node.isEmpty) return;

@@ -9,6 +9,7 @@ import '../../core/constants.dart';
 import '../../models/zone.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/routing_service.dart';
+import '../../widgets/map_credit.dart';
 
 /// Pick saved places to visit, get the shortest order (or drag your own),
 /// see the route, then hand it to Google Maps for turn-by-turn.
@@ -269,9 +270,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                               n: i + 1, color: _stops[i].category.color),
                         ),
                     ]),
-                    SimpleAttributionWidget(
-                      source: Text(AppConstants.mapAttribution),
-                    ),
+                    const MapCredit(),
                   ],
                 ),
                 SafeArea(

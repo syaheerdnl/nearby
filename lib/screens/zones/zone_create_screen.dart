@@ -10,6 +10,7 @@ import '../../models/zone.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
 import '../../widgets/zone_pin_marker.dart';
+import '../../widgets/map_credit.dart';
 
 /// Create a zone at [initialPoint], or edit [existing].
 /// The pin stays in the middle of the map; moving the map moves the place.
@@ -202,9 +203,7 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                         borderStrokeWidth: 1.5,
                       ),
                     ]),
-                    SimpleAttributionWidget(
-                      source: Text(AppConstants.mapAttribution),
-                    ),
+                    const MapCredit(),
                   ],
                 ),
                 // Fixed pin in the middle: the map moves under it.
