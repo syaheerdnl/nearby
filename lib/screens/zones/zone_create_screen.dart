@@ -278,16 +278,12 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                     const SizedBox(height: 16),
                     Text('Remind me when I', style: label),
                     const SizedBox(height: 8),
-                    SegmentedButton<TriggerType>(
-                      showSelectedIcon: false,
-                      segments: [
-                        for (final t in TriggerType.values)
-                          ButtonSegment(value: t, label: Text(t.segment)),
-                      ],
-                      selected: {_trigger},
-                      onSelectionChanged: (s) =>
-                          setState(() => _trigger = s.first),
-                    ),
+                    for (final t in TriggerType.values)
+                      _TriggerOption(
+                        trigger: t,
+                        selected: _trigger == t,
+                        onTap: () => setState(() => _trigger = t),
+                      ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -372,6 +368,91 @@ class _TypeChip extends StatelessWidget {
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   )),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// One tappable card per trigger (Arrive / Leave / Stay a while).
+class _TriggerOption extends StatelessWidget {
+  const _TriggerOption({
+    required this.trigger,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TriggerType trigger;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, title, hint) = switch (trigger) {
+      TriggerType.enter => (Icons.login, 'Arrive', 'As soon as I get there'),
+      TriggerType.exit => (Icons.logout, 'Leave', 'When I head out'),
+      TriggerType.dwell => (
+          Icons.schedule,
+          'Stay a while',
+          'After ${AppConstants.dwellDelay.inMinutes} minutes there'
+        ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected ? scheme.primaryContainer : scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 1.4 : 1),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? scheme.surface
+                        : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon,
+                      size: 19,
+                      color:
+                          selected ? scheme.primary : scheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 14.5, fontWeight: FontWeight.w600)),
+                      Text(hint,
+                          style: TextStyle(
+                              fontSize: 12, color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Icon(
+                  selected
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  color: selected ? scheme.primary : scheme.outline,
+                ),
+              ],
+            ),
           ),
         ),
       ),

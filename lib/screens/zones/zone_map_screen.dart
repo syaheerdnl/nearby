@@ -21,7 +21,7 @@ import '../../widgets/place_preview_card.dart';
 import '../../widgets/place_search_bar.dart';
 import '../../widgets/zone_pin_marker.dart';
 import '../onboarding/battery_optimization_screen.dart';
-import '../trips/trip_planner_screen.dart';
+import '../shell/shell_nav.dart';
 import 'zone_create_screen.dart';
 import 'zone_detail_screen.dart';
 
@@ -53,12 +53,29 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
     WidgetsBinding.instance.addObserver(this);
     _centerOnMeIfAllowed();
     NotificationService.instance.pendingZoneId.addListener(_openFromNotification);
+    // Home's category tiles ask the map to filter.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _nav = context.read<ShellNav>()..addListener(_takeFilter);
+      _takeFilter();
+    });
     // Cold start: the id may already be waiting.
     WidgetsBinding.instance.addPostFrameCallback((_) => _openFromNotification());
     IsolateNameServer.removePortNameMapping(kDonePortName);
     IsolateNameServer.registerPortWithName(_donePort.sendPort, kDonePortName);
     _donePort.listen((_) {
       if (mounted) context.read<ZoneProvider>().refresh();
+    });
+  }
+
+  ShellNav? _nav;
+
+  void _takeFilter() {
+    final req = _nav?.takeFilterRequest();
+    if (req == null || !mounted) return;
+    setState(() {
+      _filter = req.category;
+      _selectedId = null;
     });
   }
 
@@ -81,6 +98,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
   void dispose() {
     NotificationService.instance.pendingZoneId
         .removeListener(_openFromNotification);
+    _nav?.removeListener(_takeFilter);
     IsolateNameServer.removePortNameMapping(kDonePortName);
     _donePort.close();
     WidgetsBinding.instance.removeObserver(this);
@@ -190,67 +208,6 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
     }
   }
 
-  Future<void> _signOut() async {
-    final zones = context.read<ZoneProvider>();
-    final auth = context.read<AuthProvider>();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text(
-            'Reminders stop on this phone until you sign in again.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Sign out')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await zones.reset();
-    await auth.signOut();
-  }
-
-  void _accountMenu() {
-    final auth = context.read<AuthProvider>();
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.account_circle_outlined),
-              title: Text(auth.email ?? 'Signed in'),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.battery_saver_outlined),
-              title: const Text('Battery settings'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const BatteryOptimizationScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Sign out'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _signOut();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ZoneProvider>();
@@ -279,10 +236,12 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
             ? LatLng(all.first.latitude, all.first.longitude)
             : const LatLng(
                 AppConstants.fallbackLatitude, AppConstants.fallbackLongitude));
-    final email = auth.email ?? '';
-    final initial = email.isEmpty ? '?' : email.substring(0, 1).toUpperCase();
+    final who = auth.displayName ?? '';
+    final initial = who.isEmpty ? '?' : who.substring(0, 1).toUpperCase();
 
-    return Scaffold(
+    // Inner Scaffold height (screen minus the bottom tab bar): the sheet and
+    // the FABs are sized from it.
+    return LayoutBuilder(builder: (context, box) => Scaffold(
       // Keep the FABs still when the search keyboard opens.
       resizeToAvoidBottomInset: false,
       body: Stack(
@@ -373,7 +332,8 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                     hintText: 'Search a place',
                     biasPoint: () => _me ?? _map.camera.center,
                     trailing: GestureDetector(
-                      onTap: _accountMenu,
+                      onTap: () =>
+                          context.read<ShellNav>().goTo(ShellNav.profile),
                       child: CircleAvatar(
                         radius: 16,
                         backgroundColor: scheme.primary,
@@ -398,18 +358,27 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                         _MapChip(
                           icon: Icons.route_outlined,
                           label: 'Plan trip',
-                          onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      TripPlannerScreen(start: _me))),
+                          onTap: () =>
+                              context.read<ShellNav>().goTo(ShellNav.trips),
                         ),
-                        if (usedCategories.length > 1)
-                          for (final c in usedCategories)
+                        if (_filter != null)
+                          _MapChip(
+                            icon: Icons.close,
+                            label: 'All places',
+                            onTap: () => setState(() {
+                              _filter = null;
+                              _selectedId = null;
+                            }),
+                          ),
+                        if (usedCategories.length > 1 || _filter != null)
+                          for (final c in {...usedCategories, if (_filter != null) _filter!})
                             _MapChip(
                               label: c.label,
                               selected: _filter == c,
-                              onTap: () => setState(
-                                  () => _filter = _filter == c ? null : c),
+                              onTap: () => setState(() {
+                                _filter = _filter == c ? null : c;
+                                _selectedId = null;
+                              }),
                             ),
                       ],
                     ),
@@ -473,7 +442,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
           ? null
           : Padding(
         padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).size.height * 0.34 - 8),
+            bottom: box.maxHeight * 0.34 - 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -499,7 +468,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

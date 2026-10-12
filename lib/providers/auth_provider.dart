@@ -27,6 +27,15 @@ class AuthProvider extends ChangeNotifier {
   String? get userId => _session?.user.id;
   String? get email => _session?.user.email;
 
+  /// Username from sign-up metadata, else the part of the email before @.
+  String? get displayName {
+    final meta = _session?.user.userMetadata?['username'];
+    if (meta is String && meta.isNotEmpty) return meta;
+    final e = email;
+    if (e == null || !e.contains('@')) return null;
+    return e.split('@').first;
+  }
+
   static final usernamePattern = RegExp(r'^[a-z0-9_]{3,20}$');
 
   Future<bool> signIn(String email, String password) => _run(() async {

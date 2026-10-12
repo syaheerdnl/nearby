@@ -8,7 +8,6 @@ import '../../models/zone.dart';
 import '../../models/zone_reminder.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
-import '../../widgets/category_badge.dart';
 import '../../widgets/reminder_tile.dart';
 import 'zone_create_screen.dart';
 
@@ -163,30 +162,55 @@ class _ZoneDetailScreenState extends State<ZoneDetailScreen> {
           padding: const EdgeInsets.only(bottom: 32),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              child: Row(
-                children: [
-                  CategoryBadge(category: zone.category, size: 48),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(zone.name,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w600, fontSize: 22)),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${zone.category.label} · ${zone.triggerType.short.toLowerCase()} · ${zone.radiusMeters} m',
-                          style: TextStyle(
-                              fontSize: 13, color: scheme.onSurfaceVariant),
-                        ),
-                      ],
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: zone.category.color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(zone.category.icon,
+                          color: zone.category.color, size: 22),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(zone.name,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700, height: 1.2)),
+                          const SizedBox(height: 2),
+                          Text(zone.category.label,
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: zone.category.color)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+            _InfoRow(
+                icon: Icons.login,
+                label: 'Trigger',
+                value: zone.triggerType.segment),
+            _InfoRow(
+                icon: Icons.radar,
+                label: 'Radius',
+                value: '${zone.radiusMeters} m'),
+            const SizedBox(height: 8),
             FutureBuilder<List<TriggerLogEntry>>(
               future: _log,
               builder: (context, snap) => _StatusStrip(
@@ -507,6 +531,31 @@ class _ReminderSheetState extends State<_ReminderSheet> {
             FilledButton(onPressed: _submit, child: const Text('Save')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: scheme.onSurfaceVariant)),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }

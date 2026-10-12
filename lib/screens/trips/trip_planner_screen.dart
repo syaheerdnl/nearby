@@ -10,11 +10,15 @@ import '../../models/zone.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/routing_service.dart';
 import '../../widgets/map_credit.dart';
+import '../shell/shell_nav.dart';
 
 /// Pick saved places to visit, get the shortest order (or drag your own),
 /// see the route, then hand it to Google Maps for turn-by-turn.
 class TripPlannerScreen extends StatefulWidget {
-  const TripPlannerScreen({super.key, this.start});
+  const TripPlannerScreen({super.key, this.start, this.embedded = false});
+
+  /// Shown as the Trips tab: no back button.
+  final bool embedded;
 
   /// Where the trip starts. Falls back to a fresh GPS fix, then to the first stop.
   final LatLng? start;
@@ -38,6 +42,57 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
     super.initState();
     _start = widget.start;
     if (_start == null) _locate();
+    if (widget.embedded) {
+      // As a tab this screen lives all session: refresh the start point
+      // each time the Trips tab is opened.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _nav = context.read<ShellNav>()..addListener(_onTab);
+      });
+    }
+  }
+
+  ShellNav? _nav;
+  int _lastTab = -1;
+
+  void _onTab() {
+    final tab = _nav?.tab;
+    if (tab == ShellNav.trips && _lastTab != ShellNav.trips &&
+        widget.start == null) {
+      _locate();
+    }
+    _lastTab = tab ?? -1;
+  }
+
+  @override
+  void dispose() {
+    _nav?.removeListener(_onTab);
+    super.dispose();
+  }
+
+  /// Stops are copies; drop deleted places and pick up edits (name/position).
+  void _syncStops(List<Zone> zones) {
+    final live = {for (final z in zones) z.id: z};
+    bool changed(Zone s) {
+      final z = live[s.id];
+      return z == null ||
+          z.latitude != s.latitude ||
+          z.longitude != s.longitude ||
+          z.name != s.name ||
+          z.category != s.category;
+    }
+
+    if (!_stops.any(changed)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _stops.removeWhere((s) => !live.containsKey(s.id));
+        for (var i = 0; i < _stops.length; i++) {
+          _stops[i] = live[_stops[i].id]!;
+        }
+      });
+      _refreshRoute();
+    });
   }
 
   Future<void> _locate() async {
@@ -215,6 +270,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<ZoneProvider>();
     final zones = provider.zones;
+    _syncStops(zones);
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final muted = TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant);
@@ -273,6 +329,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                     const MapCredit(),
                   ],
                 ),
+                if (!widget.embedded)
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(8),

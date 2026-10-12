@@ -6,7 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/zone_provider.dart';
 import 'screens/onboarding/permission_intro_screen.dart';
 import 'screens/onboarding/sign_in_screen.dart';
-import 'screens/zones/zone_map_screen.dart';
+import 'screens/shell/app_shell.dart';
 import 'services/local_db_service.dart';
 
 class NearbyApp extends StatelessWidget {
@@ -78,6 +78,6 @@ class _AuthGateState extends State<_AuthGate> {
       WidgetsBinding.instance.addPostFrameCallback(
           (_) => context.read<ZoneProvider>().load());
     }
-    return const ZoneMapScreen();
+    return const AppShell();
   }
 }
