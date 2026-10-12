@@ -303,7 +303,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
             ),
             children: [
               TileLayer(
-                urlTemplate: AppConstants.osmTileUrl,
+                urlTemplate: AppConstants.tileUrl,
                 userAgentPackageName: AppConstants.userAgentPackageName,
               ),
               CircleLayer(
@@ -655,7 +655,7 @@ class _ZoneList extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-          child: Text('Map © OpenStreetMap contributors',
+          child: Text(AppConstants.mapAttribution,
               style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant)),
         ),
         if (provider.error != null)

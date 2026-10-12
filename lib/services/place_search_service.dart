@@ -5,15 +5,17 @@ import 'package:http/http.dart' as http;
 import '../core/constants.dart';
 import '../models/place_result.dart';
 
-/// Place search on OpenStreetMap data via Photon (photon.komoot.io).
+/// Place search on OpenStreetMap data.
 ///
-/// Free, no key. It is a shared public server: keep requests light (the UI
-/// debounces typing) and always send a User-Agent that identifies the app.
+/// With a Geoapify key ([Env.useGeoapify]) it uses Geoapify Autocomplete.
+/// Without one it falls back to the public Photon server (photon.komoot.io),
+/// which is a shared demo: development only, keep requests light.
 class PlaceSearchService {
   PlaceSearchService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const _host = 'photon.komoot.io';
+  static const _photonHost = 'photon.komoot.io';
+  static const _geoapifyHost = 'api.geoapify.com';
 
   /// [nearLat]/[nearLng] bias results towards that point (usually the user).
   Future<List<PlaceResult>> search(
@@ -24,7 +26,51 @@ class PlaceSearchService {
   }) async {
     final q = query.trim();
     if (q.length < 3) return const [];
-    final uri = Uri.https(_host, '/api/', {
+    return Env.useGeoapify
+        ? _geoapify(q, nearLat, nearLng, limit)
+        : _photon(q, nearLat, nearLng, limit);
+  }
+
+  Future<List<PlaceResult>> _geoapify(
+      String q, double? lat, double? lng, int limit) async {
+    final uri = Uri.https(_geoapifyHost, '/v1/geocode/autocomplete', {
+      'text': q,
+      'limit': '$limit',
+      'format': 'json',
+      if (lat != null && lng != null)
+        'bias': 'proximity:${lng.toStringAsFixed(5)},${lat.toStringAsFixed(5)}',
+      'apiKey': Env.geoapifyKey,
+    });
+    final body = await _getJson(uri);
+    final results = (body['results'] as List?) ?? const [];
+    final out = <PlaceResult>[];
+    for (final r in results.whereType<Map<String, dynamic>>()) {
+      final la = r['lat'], lo = r['lon'];
+      if (la is! num || lo is! num) continue;
+      String? s(String key) {
+        final v = r[key];
+        return v is String && v.trim().isNotEmpty ? v.trim() : null;
+      }
+
+      final name = s('name') ?? s('address_line1');
+      if (name == null) continue;
+      var subtitle = s('address_line2') ?? '';
+      if (subtitle.isEmpty || subtitle == name) {
+        subtitle = [s('city'), s('state')].whereType<String>().join(', ');
+      }
+      out.add(PlaceResult(
+        name: name,
+        subtitle: subtitle,
+        latitude: la.toDouble(),
+        longitude: lo.toDouble(),
+      ));
+    }
+    return out;
+  }
+
+  Future<List<PlaceResult>> _photon(
+      String q, double? nearLat, double? nearLng, int limit) async {
+    final uri = Uri.https(_photonHost, '/api/', {
       'q': q,
       'limit': '$limit',
       if (nearLat != null && nearLng != null) ...{
@@ -32,19 +78,27 @@ class PlaceSearchService {
         'lon': nearLng.toStringAsFixed(5),
       },
     });
-    final res = await _client
-        .get(uri, headers: {'User-Agent': AppConstants.httpUserAgent})
-        .timeout(const Duration(seconds: 10));
-    if (res.statusCode != 200) {
-      throw PlaceSearchException('Search failed (${res.statusCode}).');
-    }
-    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final body = await _getJson(uri);
     final features = (body['features'] as List?) ?? const [];
     return features
         .whereType<Map<String, dynamic>>()
         .map(_toResult)
         .whereType<PlaceResult>()
         .toList();
+  }
+
+  Future<Map<String, dynamic>> _getJson(Uri uri) async {
+    final res = await _client
+        .get(uri, headers: {'User-Agent': AppConstants.httpUserAgent})
+        .timeout(const Duration(seconds: 10));
+    if (res.statusCode != 200) {
+      throw PlaceSearchException('Search failed (${res.statusCode}).');
+    }
+    try {
+      return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    } on FormatException {
+      throw const PlaceSearchException('Search failed. Try again.');
+    }
   }
 
   PlaceResult? _toResult(Map<String, dynamic> feature) {

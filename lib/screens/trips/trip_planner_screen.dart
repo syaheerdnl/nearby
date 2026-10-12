@@ -235,7 +235,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                   options: MapOptions(initialCenter: center, initialZoom: 14),
                   children: [
                     TileLayer(
-                      urlTemplate: AppConstants.osmTileUrl,
+                      urlTemplate: AppConstants.tileUrl,
                       userAgentPackageName: AppConstants.userAgentPackageName,
                     ),
                     if (_route != null && _route!.path.length > 1)
@@ -269,8 +269,8 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                               n: i + 1, color: _stops[i].category.color),
                         ),
                     ]),
-                    const SimpleAttributionWidget(
-                      source: Text('OpenStreetMap contributors · OSRM'),
+                    SimpleAttributionWidget(
+                      source: Text(AppConstants.mapAttribution),
                     ),
                   ],
                 ),

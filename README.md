@@ -5,14 +5,14 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
 
 ## What it does
 
-- Search for a place (Photon / OpenStreetMap) or tap the map to pin one
+- Search for a place or tap the map to pin one
 - Set a radius and pick when to remind: arrive, leave or stay a while
 - Add a checklist of reminders per place
 - Get a notification when you reach the place, even with the app closed
 - Tap the notification to open that place, or press Done to tick it off
   without opening the app
 - Plan a trip across saved places, with the shortest order and per-leg
-  distance and time (OSRM), then hand it off to Google Maps
+  distance and time, then hand it off to Google Maps
 - Works offline. Everything is saved on the phone first and syncs to
   Supabase when there's a connection
 
@@ -32,11 +32,11 @@ Pulls never overwrite a row that still has local changes waiting.
 | Part | Used |
 |---|---|
 | App | Flutter, Provider |
-| Map | flutter_map + OpenStreetMap tiles |
+| Map | flutter_map, Geoapify tiles (OpenStreetMap data) |
 | Geofencing | native_geofence |
 | Local storage | sqflite |
 | Backend | Supabase (Auth, Postgres, row level security) |
-| Search / routing | Photon, OSRM |
+| Search / routing | Geoapify Autocomplete, Routing, Route Matrix |
 | Notifications | flutter_local_notifications |
 
 ## Testing
@@ -48,8 +48,10 @@ shows. On the emulator it fires about 10 s after crossing in.
 ## Run it
 
 1. Create a Supabase project and run the SQL in `supabase/` in order
-2. Copy `config.example.json` to `config.json` and fill in your project
-   URL and publishable key
+2. Copy `config.example.json` to `config.json` and fill in your Supabase
+   URL and publishable key, plus a Geoapify API key (free plan). Without
+   the Geoapify key the app falls back to the public OSM, Photon and OSRM
+   demo servers, which are fine for development only
 3. `flutter run --dart-define-from-file=config.json`
 
 Android only for now. iOS setup isn't done yet.

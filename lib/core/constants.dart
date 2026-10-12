@@ -7,6 +7,12 @@ class Env {
 
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// Optional. With a key, map tiles, search and routing use Geoapify
+  /// (free plan allows commercial use). Without one, the app falls back to
+  /// the public OSM / Photon / OSRM demo servers, fine for development only.
+  static const geoapifyKey = String.fromEnvironment('GEOAPIFY_KEY');
+  static bool get useGeoapify => geoapifyKey.isNotEmpty;
 }
 
 class AppConstants {
@@ -27,11 +33,20 @@ class AppConstants {
   static const double fallbackLatitude = 2.1896;
   static const double fallbackLongitude = 102.2501;
 
-  static const String osmTileUrl =
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  /// Raster tiles. Geoapify's osm-carto looks like the standard OSM map and
+  /// only needs the Geoapify + OSM credits (no OpenMapTiles credit).
+  static String get tileUrl => Env.useGeoapify
+      ? 'https://maps.geoapify.com/v1/tile/osm-carto/{z}/{x}/{y}@2x.png'
+          '?apiKey=${Env.geoapifyKey}'
+      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  /// Credit line shown next to every map. Geoapify's free plan requires it.
+  static String get mapAttribution => Env.useGeoapify
+      ? 'Powered by Geoapify · © OpenStreetMap contributors'
+      : '© OpenStreetMap contributors';
   static const String userAgentPackageName = 'com.syaheer.nearby';
 
-  /// Sent to Photon and OSRM, which ask apps to identify themselves.
+  /// Sent to the search/routing servers, which ask apps to identify themselves.
   static const String httpUserAgent = 'Nearby/0.1 (com.syaheer.nearby)';
 }
 

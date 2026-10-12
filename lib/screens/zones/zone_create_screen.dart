@@ -189,7 +189,7 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: AppConstants.osmTileUrl,
+                      urlTemplate: AppConstants.tileUrl,
                       userAgentPackageName: AppConstants.userAgentPackageName,
                     ),
                     CircleLayer(circles: [
@@ -202,6 +202,9 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                         borderStrokeWidth: 1.5,
                       ),
                     ]),
+                    SimpleAttributionWidget(
+                      source: Text(AppConstants.mapAttribution),
+                    ),
                   ],
                 ),
                 // Fixed pin in the middle: the map moves under it.
