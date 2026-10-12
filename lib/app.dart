@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/friend_provider.dart';
 import 'providers/zone_provider.dart';
 import 'screens/onboarding/permission_intro_screen.dart';
 import 'screens/onboarding/sign_in_screen.dart';
@@ -18,6 +19,7 @@ class NearbyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ZoneProvider()),
+        ChangeNotifierProvider(create: (_) => FriendProvider()),
       ],
       child: MaterialApp(
         title: 'Nearby',

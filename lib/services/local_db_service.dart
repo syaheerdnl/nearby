@@ -2,6 +2,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../core/constants.dart';
+import '../models/shared_list.dart';
 import '../models/trigger_log_entry.dart';
 import '../models/zone.dart';
 import '../models/zone_reminder.dart';
@@ -16,7 +17,7 @@ class LocalDbService {
   static final LocalDbService instance = LocalDbService._();
 
   static const _dbName = 'nearby.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _db;
 
@@ -39,6 +40,7 @@ class LocalDbService {
           await db.execute('ALTER TABLE zones ADD COLUMN active_from INTEGER');
           await db.execute('ALTER TABLE zones ADD COLUMN active_to INTEGER');
         }
+        if (oldVersion < 4) await _createSharedPlaces(db);
       },
       onCreate: (db, _) async {
         await db.execute('''
@@ -79,6 +81,7 @@ class LocalDbService {
             longitude REAL,
             notified INTEGER NOT NULL DEFAULT 0
           )''');
+        await _createSharedPlaces(db);
         await db.execute('''
           CREATE TABLE app_meta (
             key TEXT PRIMARY KEY,
@@ -306,6 +309,43 @@ class LocalDbService {
       await txn.delete('zone_reminders');
       await txn.delete('zones');
       await txn.delete('trigger_log');
+      await txn.delete('shared_places');
     });
+  }
+
+  // ---------- places friends shared with me ----------
+
+  static Future<void> _createSharedPlaces(Database db) => db.execute('''
+        CREATE TABLE shared_places (
+          zone_id TEXT PRIMARY KEY,
+          list_id TEXT NOT NULL,
+          list_title TEXT NOT NULL,
+          owner_name TEXT NOT NULL,
+          name TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          radius_meters INTEGER NOT NULL,
+          open_items TEXT NOT NULL DEFAULT ''
+        )''');
+
+  Future<void> replaceSharedPlaces(List<SharedPlace> places) async {
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.delete('shared_places');
+      for (final p in places) {
+        await txn.insert('shared_places', p.toLocal());
+      }
+    });
+  }
+
+  Future<List<SharedPlace>> sharedPlaces() async {
+    final rows = await (await db).query('shared_places', orderBy: 'name');
+    return rows.map(SharedPlace.fromLocal).toList();
+  }
+
+  Future<SharedPlace?> sharedPlace(String zoneId) async {
+    final rows = await (await db)
+        .query('shared_places', where: 'zone_id = ?', whereArgs: [zoneId]);
+    return rows.isEmpty ? null : SharedPlace.fromLocal(rows.first);
   }
 }

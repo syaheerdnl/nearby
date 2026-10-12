@@ -5,6 +5,7 @@ import 'package:native_geofence/native_geofence.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/constants.dart';
+import '../models/shared_list.dart';
 import '../models/zone.dart';
 import 'local_db_service.dart';
 import 'notification_service.dart';
@@ -26,6 +27,10 @@ Future<void> onGeofenceEvent(GeofenceCallbackParams params) async {
 
   for (final fence in params.geofences) {
     try {
+      if (fence.id.startsWith(kSharedFencePrefix)) {
+        await _onSharedPlace(fence.id, event, now, db, notifications);
+        continue;
+      }
       final zone = await db.zoneById(fence.id);
       if (zone == null) continue;
 
@@ -69,6 +74,43 @@ Future<void> onGeofenceEvent(GeofenceCallbackParams params) async {
       debugPrint('Geofence callback failed for ${fence.id}: $e');
     }
   }
+}
+
+/// Geofence ids for places friends shared with me: "s:<zone id>".
+const String kSharedFencePrefix = 's:';
+
+/// A friend's place: alert with the open items from the last sync.
+Future<void> _onSharedPlace(String fenceId, TriggerType event, DateTime now,
+    LocalDbService db, NotificationService notifications) async {
+  final place =
+      await db.sharedPlace(fenceId.substring(kSharedFencePrefix.length));
+  if (place == null || event != TriggerType.enter) return;
+  final last = await db.triggerLog(fenceId, limit: 1);
+  if (last.isNotEmpty && now.difference(last.first.firedAt).inSeconds < 60) {
+    return;
+  }
+  final notify = place.openItems.isNotEmpty;
+  if (notify) {
+    final who = place.ownerName.isEmpty ? '' : ' (${place.ownerName})';
+    await notifications.showZoneReminder(
+      id: fenceId.hashCode & 0x7fffffff,
+      title: "You're at ${place.name}",
+      body: '${place.listTitle}$who: ${place.openItems.length} open\n'
+          '${place.openItems.map((i) => '• $i').join('\n')}',
+      payload: '$kListPayloadPrefix${place.listId}',
+      withDone: false,
+    );
+  }
+  debugPrint('NEARBY_GEOFENCE event=enter zone="${place.name}" '
+      'notified=$notify shared=true');
+  await db.logTrigger(
+    zoneId: fenceId,
+    event: event,
+    firedAt: now,
+    latitude: null,
+    longitude: null,
+    notified: notify,
+  );
 }
 
 String _titleFor(TriggerType event, String zoneName) => switch (event) {
@@ -135,10 +177,14 @@ class GeofenceService {
   /// missing ones. Existing fences are left alone so Android dwell timers
   /// are not reset on every app resume; edits go through [register].
   /// Returns false if permission is missing (zones stay saved, just silent).
-  Future<bool> syncAll(List<Zone> zones) async {
+  Future<bool> syncAll(List<Zone> zones,
+      {List<SharedPlace> shared = const []}) async {
     if (await permissionStatus() == GeofencePermission.denied) return false;
     await init();
-    final wanted = {for (final z in zones) z.id};
+    final wanted = {
+      for (final z in zones) z.id,
+      for (final p in shared) '$kSharedFencePrefix${p.zoneId}',
+    };
     final current = await registeredIds();
     for (final id in current) {
       if (!wanted.contains(id)) await unregister(id);
@@ -149,7 +195,38 @@ class GeofenceService {
         ok = await register(zone) && ok;
       }
     }
+    // Shared places are few and can move or resize on the owner's side
+    // without us knowing, so re-register them each sync.
+    for (final p in shared) {
+      ok = await _registerShared(p) && ok;
+    }
     return ok;
+  }
+
+  Future<bool> _registerShared(SharedPlace p) async {
+    final id = '$kSharedFencePrefix${p.zoneId}';
+    try {
+      await NativeGeofenceManager.instance.removeGeofenceById(id);
+    } catch (_) {}
+    try {
+      await NativeGeofenceManager.instance.createGeofence(
+        Geofence(
+          id: id,
+          location: Location(latitude: p.latitude, longitude: p.longitude),
+          radiusMeters: p.radiusMeters.toDouble(),
+          triggers: {GeofenceEvent.enter},
+          iosSettings: const IosGeofenceSettings(initialTrigger: false),
+          androidSettings: const AndroidGeofenceSettings(
+            initialTriggers: <GeofenceEvent>{},
+          ),
+        ),
+        onGeofenceEvent,
+      );
+      return true;
+    } on NativeGeofenceException catch (e) {
+      debugPrint('Register shared $id failed: ${e.code} ${e.message}');
+      return false;
+    }
   }
 
   Future<bool> register(Zone zone) async {

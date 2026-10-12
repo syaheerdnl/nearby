@@ -8,7 +8,9 @@ import '../../models/zone.dart';
 import '../../models/zone_reminder.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
+import '../../services/list_repository.dart';
 import '../../widgets/reminder_tile.dart';
+import '../lists/shared_list_screen.dart';
 import 'zone_create_screen.dart';
 
 class ZoneDetailScreen extends StatefulWidget {
@@ -221,6 +223,7 @@ class _ZoneDetailScreenState extends State<ZoneDetailScreen> {
                     ? '${_fmtMin(context, zone.activeFrom!)} to '
                         '${_fmtMin(context, zone.activeTo!)}'
                     : 'Any time'),
+            _SharedListCard(zone: zone),
             const SizedBox(height: 8),
             FutureBuilder<List<TriggerLogEntry>>(
               future: _log,
@@ -575,3 +578,149 @@ class _InfoRow extends StatelessWidget {
 
 String _fmtMin(BuildContext context, int m) =>
     TimeOfDay(hour: m ~/ 60, minute: m % 60).format(context);
+
+
+/// Owner's shared list for this place: start one, or open it.
+class _SharedListCard extends StatefulWidget {
+  const _SharedListCard({required this.zone});
+  final Zone zone;
+
+  @override
+  State<_SharedListCard> createState() => _SharedListCardState();
+}
+
+class _SharedListCardState extends State<_SharedListCard> {
+  final _repo = ListRepository();
+  String? _listId;
+  String? _summary;
+  bool _loading = true;
+  bool _offline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final id = await _repo.listIdForZone(widget.zone.id);
+      String? summary;
+      if (id != null) {
+        final list = await _repo.getList(id);
+        final items = await _repo.items(id);
+        final open = items.where((i) => !i.isDone).length;
+        final people = (await _repo.access(id)).length;
+        summary = '${list.title} · $open open · '
+            '${people == 0 ? 'not shared yet' : 'shared with $people'}';
+      }
+      if (!mounted) return;
+      setState(() {
+        _listId = id;
+        _summary = summary;
+        _offline = false;
+      });
+    } catch (e) {
+      debugPrint('Load shared list card failed: $e');
+      if (mounted) setState(() => _offline = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _open(String id) async {
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => SharedListScreen(listId: id)));
+    if (mounted) _load();
+  }
+
+  Future<void> _start() async {
+    final title = TextEditingController(text: 'Barang ${widget.zone.name}');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Start a shared list'),
+        content: TextField(
+          controller: title,
+          autofocus: true,
+          maxLength: 60,
+          decoration: const InputDecoration(labelText: 'List name'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: () => Navigator.pop(ctx, title.text.trim()),
+              child: const Text('Create')),
+        ],
+      ),
+    );
+    // (title isn't disposed: the dialog may still be animating out.)
+    if (name == null || name.isEmpty || !mounted) return;
+    try {
+      // A new place may not be on the server yet: push it first.
+      await context.read<ZoneProvider>().refresh();
+      if (!mounted) return;
+      final id = await _repo.createList(widget.zone.id, name);
+      if (mounted) await _open(id);
+    } catch (e) {
+      debugPrint('Create list failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Couldn't create the list. Check your connection.")));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (_loading) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Material(
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _offline
+              ? _load
+              : (_listId == null ? _start : () => _open(_listId!)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Icon(Icons.groups_outlined, color: scheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        _listId == null
+                            ? 'Start a shared list'
+                            : 'Shared list',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      _offline
+                          ? 'Offline. Tap to retry.'
+                          : _summary ??
+                              'Family can see it, buy things and get alerts here',
+                      style: TextStyle(
+                          fontSize: 12, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}

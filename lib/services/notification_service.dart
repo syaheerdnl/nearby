@@ -9,6 +9,10 @@ import 'local_db_service.dart';
 /// Action id for the "Done" button on reminder notifications.
 const String kDoneActionId = 'done';
 
+/// Notification payload for a shared list: "list:<list id>". Plain zone ids
+/// otherwise.
+const String kListPayloadPrefix = 'list:';
+
 /// Port the map screen listens on, so a "Done" from the background isolate
 /// refreshes the open app right away.
 const String kDonePortName = 'nearby_done';
@@ -108,7 +112,9 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
-    required String zoneId,
+    String? zoneId,
+    String? payload,
+    bool withDone = true,
   }) async {
     await init();
     if (!_ready) return;
@@ -117,7 +123,7 @@ class NotificationService {
         id: id,
         title: title,
         body: body,
-        payload: zoneId,
+        payload: payload ?? zoneId,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             AppConstants.notificationChannelId,
@@ -128,15 +134,17 @@ class NotificationService {
             styleInformation: BigTextStyleInformation(body),
             icon: 'ic_stat_nearby',
             color: const Color(0xFF3D3AA8),
-            actions: const <AndroidNotificationAction>[
-              AndroidNotificationAction(
-                kDoneActionId,
-                'Done',
-                // Handled in the background; the app stays closed.
-                showsUserInterface: false,
-                cancelNotification: true,
-              ),
-            ],
+            actions: withDone
+                ? const <AndroidNotificationAction>[
+                    AndroidNotificationAction(
+                      kDoneActionId,
+                      'Done',
+                      // Handled in the background; the app stays closed.
+                      showsUserInterface: false,
+                      cancelNotification: true,
+                    ),
+                  ]
+                : null,
           ),
           iOS: const DarwinNotificationDetails(
             interruptionLevel: InterruptionLevel.timeSensitive,

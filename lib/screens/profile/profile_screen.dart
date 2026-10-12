@@ -3,8 +3,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/friend_provider.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
+import '../friends/friends_screen.dart';
 import '../onboarding/battery_optimization_screen.dart';
 
 /// Account and the settings that decide whether reminders actually fire.
@@ -41,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _signOut() async {
     final zones = context.read<ZoneProvider>();
     final auth = context.read<AuthProvider>();
+    final friends = context.read<FriendProvider>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -60,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
     if (ok != true) return;
     await zones.reset();
+    friends.reset();
     await auth.signOut();
   }
 
@@ -115,6 +119,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             ],
           ),
           const SizedBox(height: 22),
+          _Row(
+            icon: Icons.group_outlined,
+            title: 'Friends',
+            subtitle: 'Find people to share lists with',
+            onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FriendsScreen())),
+          ),
+          const SizedBox(height: 14),
           Text('Reminders',
               style: TextStyle(
                   fontSize: 13,

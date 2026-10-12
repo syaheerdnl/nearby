@@ -2,21 +2,37 @@ import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
 import '../core/place_category.dart';
+import '../models/shared_list.dart';
 import '../models/trigger_log_entry.dart';
 import '../models/zone.dart';
 import '../models/zone_reminder.dart';
 import '../services/geofence_service.dart';
+import '../services/list_repository.dart';
+import '../services/local_db_service.dart';
 import '../services/zone_repository.dart';
 
 /// Zone + reminder state for the UI. Keeps OS geofence registrations in
 /// step with the saved zones.
 class ZoneProvider extends ChangeNotifier {
-  ZoneProvider({ZoneRepository? repository, GeofenceService? geofences})
+  ZoneProvider(
+      {ZoneRepository? repository,
+      GeofenceService? geofences,
+      ListRepository? lists})
       : _repo = repository ?? ZoneRepository(),
-        _geo = geofences ?? GeofenceService.instance;
+        _geo = geofences ?? GeofenceService.instance,
+        _lists = lists ?? ListRepository();
 
   final ZoneRepository _repo;
   final GeofenceService _geo;
+  final ListRepository _lists;
+
+  /// Places friends shared with me (claim access): watched for alerts.
+  List<SharedPlace> _sharedPlaces = const [];
+  List<SharedPlace> get sharedPlaces => _sharedPlaces;
+
+  /// Every list shared with me (view or claim), for Home.
+  List<SharedList> _sharedLists = const [];
+  List<SharedList> get sharedLists => _sharedLists;
 
   List<Zone> _zones = const [];
   final Map<String, List<ZoneReminder>> _reminders = {};
@@ -68,6 +84,12 @@ class ZoneProvider extends ChangeNotifier {
     } catch (e) {
       // Offline or Supabase down: keep working from local data.
       debugPrint('Refresh failed: $e');
+    }
+    try {
+      await _lists.refreshSharedWithMe();
+      _sharedLists = await _lists.sharedWithMe();
+    } catch (e) {
+      debugPrint('Shared lists refresh failed: $e');
     }
     try {
       await _readLocal();
@@ -172,6 +194,8 @@ class ZoneProvider extends ChangeNotifier {
     await _geo.unregisterAll();
     await _repo.clearLocal();
     _zones = const [];
+    _sharedPlaces = const [];
+    _sharedLists = const [];
     _reminders.clear();
     _registeredIds = const {};
     notifyListeners();
@@ -179,6 +203,7 @@ class ZoneProvider extends ChangeNotifier {
 
   Future<void> _readLocal() async {
     _zones = await _repo.zones();
+    _sharedPlaces = await LocalDbService.instance.sharedPlaces();
     for (final z in _zones) {
       await _readReminders(z.id);
     }
@@ -199,7 +224,7 @@ class ZoneProvider extends ChangeNotifier {
   Future<void> _syncGeofences() async {
     _permission = await _geo.permissionStatus();
     if (_permission == GeofencePermission.denied) return;
-    await _geo.syncAll(_zones);
+    await _geo.syncAll(_zones, shared: _sharedPlaces);
     _registeredIds = await _geo.registeredIds();
   }
 }

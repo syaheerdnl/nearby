@@ -6,6 +6,7 @@ import '../../core/place_category.dart';
 import '../../models/zone.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/zone_provider.dart';
+import '../lists/shared_list_screen.dart';
 import '../shell/shell_nav.dart';
 import '../zones/zone_detail_screen.dart';
 
@@ -192,6 +193,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ],
             ),
+            if (provider.sharedLists.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Text('Shared with you',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              for (final l in provider.sharedLists)
+                _SharedCard(
+                  title: l.title,
+                  subtitle: [
+                    l.zoneName,
+                    'from ${l.ownerName}',
+                    l.canEdit ? 'can buy' : 'view only',
+                  ].join(' · '),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => SharedListScreen(listId: l.id))),
+                ),
+            ],
             const SizedBox(height: 18),
             _SectionHeader(
                 title: 'Your places',
@@ -477,6 +495,54 @@ class _PlaceCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _SharedCard extends StatelessWidget {
+  const _SharedCard(
+      {required this.title, required this.subtitle, required this.onTap});
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Material(
+        color: scheme.primaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Icon(Icons.groups_outlined, color: scheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w600)),
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ]),
           ),
         ),
       ),

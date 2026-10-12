@@ -21,6 +21,7 @@ import '../../widgets/place_preview_card.dart';
 import '../../widgets/place_search_bar.dart';
 import '../../widgets/zone_pin_marker.dart';
 import '../onboarding/battery_optimization_screen.dart';
+import '../lists/shared_list_screen.dart';
 import '../shell/shell_nav.dart';
 import 'zone_create_screen.dart';
 import 'zone_detail_screen.dart';
@@ -88,8 +89,10 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
     // Drop anything stacked on top (another place, the trip planner) so
     // back always returns to the map.
     Navigator.of(context).popUntil((r) => r.isFirst);
-    Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ZoneDetailScreen(zoneId: id)));
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => id.startsWith(kListPayloadPrefix)
+            ? SharedListScreen(listId: id.substring(kListPayloadPrefix.length))
+            : ZoneDetailScreen(zoneId: id)));
     // Reminders may have been switched off by "Done" while we were away.
     context.read<ZoneProvider>().refresh();
   }
