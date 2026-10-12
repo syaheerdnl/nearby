@@ -97,6 +97,9 @@ class ZoneProvider extends ChangeNotifier {
     required int radiusMeters,
     required TriggerType triggerType,
     required PlaceCategory category,
+    bool onceOnly = false,
+    int? activeFrom,
+    int? activeTo,
   }) async {
     final zone = await _repo.createZone(
       name: name,
@@ -105,6 +108,9 @@ class ZoneProvider extends ChangeNotifier {
       radiusMeters: radiusMeters,
       triggerType: triggerType,
       category: category,
+      onceOnly: onceOnly,
+      activeFrom: activeFrom,
+      activeTo: activeTo,
     );
     await _readLocal();
     await _registerOne(zone);

@@ -210,6 +210,17 @@ class _ZoneDetailScreenState extends State<ZoneDetailScreen> {
                 icon: Icons.radar,
                 label: 'Radius',
                 value: '${zone.radiusMeters} m'),
+            _InfoRow(
+                icon: Icons.repeat,
+                label: 'How often',
+                value: zone.onceOnly ? 'Just once' : 'Every time'),
+            _InfoRow(
+                icon: Icons.schedule,
+                label: 'Active',
+                value: zone.hasActiveWindow
+                    ? '${_fmtMin(context, zone.activeFrom!)} to '
+                        '${_fmtMin(context, zone.activeTo!)}'
+                    : 'Any time'),
             const SizedBox(height: 8),
             FutureBuilder<List<TriggerLogEntry>>(
               future: _log,
@@ -560,3 +571,7 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
+
+
+String _fmtMin(BuildContext context, int m) =>
+    TimeOfDay(hour: m ~/ 60, minute: m % 60).format(context);

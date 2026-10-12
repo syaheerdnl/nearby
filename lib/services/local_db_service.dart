@@ -16,7 +16,7 @@ class LocalDbService {
   static final LocalDbService instance = LocalDbService._();
 
   static const _dbName = 'nearby.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _db;
 
@@ -33,6 +33,12 @@ class LocalDbService {
           await db.execute(
               "ALTER TABLE zones ADD COLUMN category TEXT NOT NULL DEFAULT 'other'");
         }
+        if (oldVersion < 3) {
+          await db.execute(
+              'ALTER TABLE zones ADD COLUMN once_only INTEGER NOT NULL DEFAULT 0');
+          await db.execute('ALTER TABLE zones ADD COLUMN active_from INTEGER');
+          await db.execute('ALTER TABLE zones ADD COLUMN active_to INTEGER');
+        }
       },
       onCreate: (db, _) async {
         await db.execute('''
@@ -45,6 +51,9 @@ class LocalDbService {
             radius_meters INTEGER NOT NULL,
             trigger_type TEXT NOT NULL,
             category TEXT NOT NULL DEFAULT 'other',
+            once_only INTEGER NOT NULL DEFAULT 0,
+            active_from INTEGER,
+            active_to INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             sync_status TEXT NOT NULL DEFAULT 'pending_upsert'

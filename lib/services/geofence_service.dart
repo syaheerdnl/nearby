@@ -39,7 +39,9 @@ Future<void> onGeofenceEvent(GeofenceCallbackParams params) async {
       }
 
       final reminders = await db.remindersForZone(zone.id, activeOnly: true);
-      final notify = reminders.isNotEmpty;
+      // Outside the place's active hours: log the visit, stay quiet.
+      final inWindow = zone.isActiveAt(DateTime.now());
+      final notify = reminders.isNotEmpty && inWindow;
       if (notify) {
         await notifications.showZoneReminder(
           id: zone.id.hashCode & 0x7fffffff,
@@ -50,9 +52,11 @@ Future<void> onGeofenceEvent(GeofenceCallbackParams params) async {
           zoneId: zone.id,
         );
       }
+      // "Just once": switch the reminders off now they've been shown.
+      if (notify && zone.onceOnly) await db.turnOffReminders(zone.id);
       // Grepped by tools/geofence_test.sh to measure trigger latency.
       debugPrint('NEARBY_GEOFENCE event=${event.name} zone="${zone.name}" '
-          'notified=$notify');
+          'notified=$notify inWindow=$inWindow once=${zone.onceOnly}');
       await db.logTrigger(
         zoneId: zone.id,
         event: event,

@@ -39,6 +39,9 @@ class ZoneRepository {
     required int radiusMeters,
     required TriggerType triggerType,
     required PlaceCategory category,
+    bool onceOnly = false,
+    int? activeFrom,
+    int? activeTo,
   }) async {
     final now = DateTime.now().toUtc();
     final zone = Zone(
@@ -52,6 +55,9 @@ class ZoneRepository {
       category: category,
       createdAt: now,
       updatedAt: now,
+      onceOnly: onceOnly,
+      activeFrom: activeFrom,
+      activeTo: activeTo,
     );
     await _local.saveZone(zone, SyncStatus.pendingUpsert);
     _pushLater();

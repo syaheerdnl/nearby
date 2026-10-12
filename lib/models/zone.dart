@@ -14,6 +14,9 @@ class Zone {
     required this.category,
     required this.createdAt,
     required this.updatedAt,
+    this.onceOnly = false,
+    this.activeFrom,
+    this.activeTo,
   });
 
   final String id;
@@ -27,6 +30,28 @@ class Zone {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// After the first alert, switch this place's reminders off.
+  final bool onceOnly;
+
+  /// Quiet outside this window. Minutes after local midnight; both null =
+  /// any time. from > to wraps past midnight.
+  final int? activeFrom;
+  final int? activeTo;
+
+  bool get hasActiveWindow => activeFrom != null && activeTo != null;
+
+  /// Whether an alert may show at [localTime].
+  bool isActiveAt(DateTime localTime) => !hasActiveWindow ||
+      minuteInWindow(
+          localTime.hour * 60 + localTime.minute, activeFrom!, activeTo!);
+
+  /// [m] inside [from, to] (inclusive start, exclusive end); wraps midnight
+  /// when from > to. from == to means all day.
+  static bool minuteInWindow(int m, int from, int to) {
+    if (from == to) return true;
+    return from < to ? (m >= from && m < to) : (m >= from || m < to);
+  }
+
   Zone copyWith({
     String? name,
     double? latitude,
@@ -35,6 +60,10 @@ class Zone {
     TriggerType? triggerType,
     PlaceCategory? category,
     DateTime? updatedAt,
+    bool? onceOnly,
+    int? activeFrom,
+    int? activeTo,
+    bool clearActiveWindow = false,
   }) {
     return Zone(
       id: id,
@@ -47,6 +76,9 @@ class Zone {
       category: category ?? this.category,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      onceOnly: onceOnly ?? this.onceOnly,
+      activeFrom: clearActiveWindow ? null : (activeFrom ?? this.activeFrom),
+      activeTo: clearActiveWindow ? null : (activeTo ?? this.activeTo),
     );
   }
 
@@ -60,6 +92,9 @@ class Zone {
         'radius_meters': radiusMeters,
         'trigger_type': triggerType.name,
         'category': category.name,
+        'once_only': onceOnly,
+        'active_from': activeFrom,
+        'active_to': activeTo,
         'created_at': createdAt.toUtc().toIso8601String(),
       };
 
@@ -74,6 +109,9 @@ class Zone {
         category: PlaceCategory.fromName(row['category'] as String?),
         createdAt: DateTime.parse(row['created_at'] as String),
         updatedAt: DateTime.parse(row['updated_at'] as String),
+        onceOnly: row['once_only'] as bool? ?? false,
+        activeFrom: (row['active_from'] as num?)?.toInt(),
+        activeTo: (row['active_to'] as num?)?.toInt(),
       );
 
   /// sqflite row (dates as ISO strings).
@@ -88,6 +126,9 @@ class Zone {
         'category': category.name,
         'created_at': createdAt.toUtc().toIso8601String(),
         'updated_at': updatedAt.toUtc().toIso8601String(),
+        'once_only': onceOnly ? 1 : 0,
+        'active_from': activeFrom,
+        'active_to': activeTo,
         'sync_status': status.value,
       };
 
@@ -102,5 +143,8 @@ class Zone {
         category: PlaceCategory.fromName(row['category'] as String?),
         createdAt: DateTime.parse(row['created_at']! as String),
         updatedAt: DateTime.parse(row['updated_at']! as String),
+        onceOnly: (row['once_only'] as num? ?? 0) == 1,
+        activeFrom: (row['active_from'] as num?)?.toInt(),
+        activeTo: (row['active_to'] as num?)?.toInt(),
       );
 }

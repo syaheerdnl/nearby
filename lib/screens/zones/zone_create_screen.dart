@@ -41,7 +41,14 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
   late double _radius;
   late TriggerType _trigger;
   late PlaceCategory _category;
+  late bool _onceOnly;
+  // Active window in minutes after midnight; null = any time.
+  TimeOfDay? _from;
+  TimeOfDay? _to;
   bool _saving = false;
+
+  static TimeOfDay _tod(int m) => TimeOfDay(hour: m ~/ 60, minute: m % 60);
+  static int _min(TimeOfDay t) => t.hour * 60 + t.minute;
 
   bool get _editing => widget.existing != null;
 
@@ -53,6 +60,11 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
     _radius = (z?.radiusMeters ?? AppConstants.defaultRadiusMeters).toDouble();
     _trigger = z?.triggerType ?? TriggerType.enter;
     _category = z?.category ?? _guessCategory(widget.initialName);
+    _onceOnly = z?.onceOnly ?? false;
+    if (z != null && z.hasActiveWindow) {
+      _from = _tod(z.activeFrom!);
+      _to = _tod(z.activeTo!);
+    }
     final suggested = widget.initialName ?? '';
     _name.text = z?.name ??
         (suggested.length > 60 ? suggested.substring(0, 60) : suggested);
@@ -143,6 +155,10 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
           radiusMeters: _radius.round(),
           triggerType: _trigger,
           category: _category,
+          onceOnly: _onceOnly,
+          activeFrom: _from == null ? null : _min(_from!),
+          activeTo: _to == null ? null : _min(_to!),
+          clearActiveWindow: _from == null,
         );
         await zones.updateZone(saved);
       } else {
@@ -153,6 +169,9 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
           radiusMeters: _radius.round(),
           triggerType: _trigger,
           category: _category,
+          onceOnly: _onceOnly,
+          activeFrom: _from == null ? null : _min(_from!),
+          activeTo: _to == null ? null : _min(_to!),
         );
       }
       HapticFeedback.lightImpact();
@@ -308,6 +327,69 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
+                    const SizedBox(height: 16),
+                    Text('How often', style: label),
+                    const SizedBox(height: 8),
+                    _ChoiceCard(
+                      title: 'Every time',
+                      hint: 'Good for Home, Office',
+                      selected: !_onceOnly,
+                      onTap: () => setState(() => _onceOnly = false),
+                    ),
+                    _ChoiceCard(
+                      title: 'Just once',
+                      hint: 'Reminders turn off after the first alert',
+                      selected: _onceOnly,
+                      onTap: () => setState(() => _onceOnly = true),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Text('Only between these times',
+                                style: label)),
+                        Switch(
+                          value: _from != null,
+                          onChanged: (on) => setState(() {
+                            if (on) {
+                              _from = const TimeOfDay(hour: 8, minute: 0);
+                              _to = const TimeOfDay(hour: 22, minute: 0);
+                            } else {
+                              _from = null;
+                              _to = null;
+                            }
+                          }),
+                        ),
+                      ],
+                    ),
+                    if (_from != null) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _TimeBox(
+                              label: 'From',
+                              time: _from!,
+                              onPick: (t) => setState(() => _from = t),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _TimeBox(
+                              label: 'Until',
+                              time: _to!,
+                              onPick: (t) => setState(() => _to = t),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "Arrive outside these hours and Nearby stays quiet. "
+                        "It doesn't remind you later.",
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: _saving ? null : _save,
@@ -453,6 +535,107 @@ class _TriggerOption extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Two-option card (How often).
+class _ChoiceCard extends StatelessWidget {
+  const _ChoiceCard({
+    required this.title,
+    required this.hint,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String hint;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected ? scheme.primaryContainer : scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 1.4 : 1),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 14.5, fontWeight: FontWeight.w600)),
+                      Text(hint,
+                          style: TextStyle(
+                              fontSize: 12, color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Icon(
+                  selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: selected ? scheme.primary : scheme.outline,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable time field (From / Until).
+class _TimeBox extends StatelessWidget {
+  const _TimeBox({required this.label, required this.time, required this.onPick});
+  final String label;
+  final TimeOfDay time;
+  final ValueChanged<TimeOfDay> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
+          final t = await showTimePicker(context: context, initialTime: time);
+          if (t != null) onPick(t);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+              Text(time.format(context),
+                  style: const TextStyle(
+                      fontSize: 15.5, fontWeight: FontWeight.w600)),
+            ],
           ),
         ),
       ),
