@@ -12,11 +12,13 @@ class SharedPinMarker extends StatelessWidget {
     required this.label,
     this.openCount = 0,
     this.onTap,
+    this.onLongPress,
   });
 
   final String label;
   final int openCount;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   static const double width = ZonePinMarker.width;
   static const double height = ZonePinMarker.height;
@@ -72,6 +74,7 @@ class SharedPinMarker extends StatelessWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
+          onLongPress: onLongPress,
           child: SizedBox(width: d + 8, height: height, child: Center(child: disc)),
         ),
         Expanded(

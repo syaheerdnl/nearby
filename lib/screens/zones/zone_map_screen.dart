@@ -2,6 +2,7 @@ import 'dart:isolate';
 import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -11,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../core/place_category.dart';
 import '../../core/theme.dart';
+import '../../models/shared_list.dart';
 import '../../models/zone.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/zone_provider.dart';
@@ -21,6 +23,7 @@ import '../../widgets/category_badge.dart';
 import '../../widgets/place_preview_card.dart';
 import '../../widgets/place_search_bar.dart';
 import '../../widgets/shared_pin_marker.dart';
+import '../../widgets/shared_place_sheet.dart';
 import '../../widgets/zone_pin_marker.dart';
 import '../onboarding/battery_optimization_screen.dart';
 import '../lists/shared_list_screen.dart';
@@ -199,11 +202,35 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
     _map.move(LatLng(z.latitude - 0.0012 * (16 / zoom), z.longitude), zoom);
   }
 
-  Future<void> _directionsTo(Zone z) async {
+  void _openSharedList(SharedPlace p) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => SharedListScreen(listId: p.listId)));
+  }
+
+  /// Long-press on a shared pin: quick look without leaving the map.
+  void _showSharedPlace(SharedPlace p) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SharedPlaceSheet(
+        place: p,
+        onDirections: () {
+          Navigator.of(ctx).pop();
+          _directionsTo(p.latitude, p.longitude);
+        },
+        onOpen: () {
+          Navigator.of(ctx).pop();
+          _openSharedList(p);
+        },
+      ),
+    );
+  }
+
+  Future<void> _directionsTo(double lat, double lng) async {
     final uri = Uri.https('www.google.com', '/maps/dir/', {
       'api': '1',
-      'destination':
-          '${z.latitude.toStringAsFixed(6)},${z.longitude.toStringAsFixed(6)}',
+      'destination': '${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}',
       'travelmode': 'driving',
     });
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -345,10 +372,8 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                               ? p.name
                               : '${p.name} · ${p.ownerName}',
                           openCount: p.openItems.length,
-                          onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      SharedListScreen(listId: p.listId))),
+                          onTap: () => _openSharedList(p),
+                          onLongPress: () => _showSharedPlace(p),
                         ),
                       ),
                 ],
@@ -439,7 +464,8 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                           _me!.longitude, selected.latitude, selected.longitude),
                   onToggleDone: (r, done) =>
                       provider.updateReminder(r.copyWith(active: !done)),
-                  onDirections: () => _directionsTo(selected),
+                  onDirections: () =>
+                      _directionsTo(selected.latitude, selected.longitude),
                   onOpen: () => _openZone(selected),
                   onClose: () => setState(() => _selectedId = null),
                 ),
