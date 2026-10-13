@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
 import '../../core/place_category.dart';
+import '../../core/theme.dart';
 import '../../models/zone.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/zone_provider.dart';
@@ -19,6 +20,7 @@ import '../../services/notification_service.dart';
 import '../../widgets/category_badge.dart';
 import '../../widgets/place_preview_card.dart';
 import '../../widgets/place_search_bar.dart';
+import '../../widgets/shared_pin_marker.dart';
 import '../../widgets/zone_pin_marker.dart';
 import '../onboarding/battery_optimization_screen.dart';
 import '../lists/shared_list_screen.dart';
@@ -279,6 +281,17 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                       borderColor: z.category.color,
                       borderStrokeWidth: 1.5,
                     ),
+                  // Places friends shared with me (hidden while filtering).
+                  if (_filter == null)
+                    for (final p in provider.sharedPlaces)
+                      CircleMarker(
+                        point: LatLng(p.latitude, p.longitude),
+                        radius: p.radiusMeters.toDouble(),
+                        useRadiusInMeter: true,
+                        color: AppTheme.indigo.withValues(alpha: 0.06),
+                        borderColor: AppTheme.indigo.withValues(alpha: 0.7),
+                        borderStrokeWidth: 1.2,
+                      ),
                 ],
               ),
               MarkerLayer(
@@ -321,6 +334,23 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
                         onTap: () => _selectZone(z),
                       ),
                     ),
+                  if (_filter == null)
+                    for (final p in provider.sharedPlaces)
+                      Marker(
+                        point: LatLng(p.latitude, p.longitude),
+                        width: SharedPinMarker.width,
+                        height: SharedPinMarker.height,
+                        child: SharedPinMarker(
+                          label: p.ownerName.isEmpty
+                              ? p.name
+                              : '${p.name} · ${p.ownerName}',
+                          openCount: p.openItems.length,
+                          onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      SharedListScreen(listId: p.listId))),
+                        ),
+                      ),
                 ],
               ),
             ],

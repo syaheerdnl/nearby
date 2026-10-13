@@ -213,7 +213,8 @@ class _SharedListScreenState extends State<SharedListScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final list = _list;
-    final open = _items.where((i) => !i.isDone).length;
+    // Open + claimed: everything still to buy (the map badge counts open only).
+    final toBuy = _items.where((i) => !i.isDone).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -255,7 +256,7 @@ class _SharedListScreenState extends State<SharedListScreen> {
                         [
                           list!.zoneName,
                           if (!list.iOwn) 'from ${list.ownerName}',
-                          '$open open',
+                          '$toBuy to buy',
                         ].join(' · '),
                         style: TextStyle(color: scheme.onSurfaceVariant),
                       ),
