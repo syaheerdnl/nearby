@@ -1,5 +1,5 @@
 # Copy to key.properties (gitignored) and fill in. Paths are relative to android/app/.
-storeFile=../../../nearby-release.jks
+storeFile=../../nearby-release.jks
 storePassword=
 keyAlias=nearby
 keyPassword=
