@@ -75,6 +75,21 @@ class ZoneProvider extends ChangeNotifier {
     await refresh();
   }
 
+  /// Lighter than [refresh]: only the places friends shared with me. Updates
+  /// the local cache (map badges, arrival alerts) and their geofences.
+  Future<void> refreshShared() async {
+    try {
+      await _lists.refreshSharedWithMe();
+      _sharedLists = await _lists.sharedWithMe();
+      _sharedPlaces = await LocalDbService.instance.sharedPlaces();
+      await _syncGeofences();
+      notifyListeners();
+    } catch (e) {
+      // Offline: keep the old cache, the next full refresh retries.
+      debugPrint('Shared refresh failed: $e');
+    }
+  }
+
   Future<void> refresh() async {
     _syncing = true;
     notifyListeners();

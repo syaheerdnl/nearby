@@ -609,9 +609,9 @@ class _SharedListCardState extends State<_SharedListCard> {
       if (id != null) {
         final list = await _repo.getList(id);
         final items = await _repo.items(id);
-        final open = items.where((i) => !i.isDone).length;
+        final toBuy = items.where((i) => !i.isDone).length;
         final people = (await _repo.access(id)).length;
-        summary = '${list.title} · $open open · '
+        summary = '${list.title} · $toBuy to buy · '
             '${people == 0 ? 'not shared yet' : 'shared with $people'}';
       }
       if (!mounted) return;

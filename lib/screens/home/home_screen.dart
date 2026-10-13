@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/place_category.dart';
+import '../../core/theme.dart';
 import '../../models/zone.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/zone_provider.dart';
@@ -285,9 +286,10 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    // Fixed accent, not scheme.primary: dark mode makes primary pale, and the
+    // white text on top becomes hard to read.
     return Material(
-      color: scheme.primary,
+      color: AppTheme.indigo,
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -337,12 +339,12 @@ class _HeroCard extends StatelessWidget {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Text(actionLabel,
                               style: TextStyle(
-                                  color: scheme.primary,
+                                  color: AppTheme.indigo,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13)),
                           const SizedBox(width: 4),
                           Icon(Icons.chevron_right,
-                              size: 18, color: scheme.primary),
+                              size: 18, color: AppTheme.indigo),
                         ]),
                       ),
                     ),

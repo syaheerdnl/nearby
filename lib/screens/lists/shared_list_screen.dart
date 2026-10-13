@@ -34,10 +34,12 @@ class _SharedListScreenState extends State<SharedListScreen> {
   bool _loading = true;
   RealtimeChannel? _channel;
   Timer? _reloadSoon;
+  ZoneProvider? _zones;
 
   @override
   void initState() {
     super.initState();
+    _zones = context.read<ZoneProvider>();
     _load();
     _channel = _repo.watch(widget.listId, _scheduleReload, onDelete: (id) {
       if (_items.any((i) => i.id == id)) _scheduleReload();
@@ -52,6 +54,9 @@ class _SharedListScreenState extends State<SharedListScreen> {
 
   @override
   void dispose() {
+    // Items may have changed here: refresh the cached copy that the map
+    // badge and the arrival alert read from.
+    _zones?.refreshShared();
     _reloadSoon?.cancel();
     final c = _channel;
     if (c != null) _repo.unwatch(c);
@@ -151,7 +156,9 @@ class _SharedListScreenState extends State<SharedListScreen> {
       if (!item.isDone)
         (Icons.check_circle_outline, 'Bought',
             () => _repo.apply(item, ItemAction.bought)),
-      if (item.status != ItemStatus.open)
+      // Skip when "I can't buy it after all" is shown: same result.
+      if (item.status != ItemStatus.open &&
+          !(item.status == ItemStatus.claimed && item.claimedBy == me))
         (Icons.replay, 'Put back on the list',
             () => _repo.apply(item, ItemAction.reopen)),
       if (list.iOwn || item.createdBy == me)
