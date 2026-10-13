@@ -11,6 +11,7 @@ import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
 import '../../widgets/zone_pin_marker.dart';
 import '../../widgets/map_credit.dart';
+import '../../widgets/app_tile_layer.dart';
 
 /// Create a zone at [initialPoint], or edit [existing].
 /// The pin stays in the middle of the map; moving the map moves the place.
@@ -208,10 +209,7 @@ class _ZoneCreateScreenState extends State<ZoneCreateScreen> {
                     },
                   ),
                   children: [
-                    TileLayer(
-                      urlTemplate: AppConstants.tileUrl,
-                      userAgentPackageName: AppConstants.userAgentPackageName,
-                    ),
+                    const AppTileLayer(),
                     CircleLayer(circles: [
                       CircleMarker(
                         point: _point,

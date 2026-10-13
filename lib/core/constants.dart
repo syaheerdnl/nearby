@@ -48,6 +48,18 @@ class AppConstants {
 
   /// Sent to the search/routing servers, which ask apps to identify themselves.
   static const String httpUserAgent = 'Nearby/0.1 (com.syaheer.nearby)';
+
+  /// Geoapify can't restrict a key to an Android app, only to HTTP referrers,
+  /// origins or IPs. The key is restricted to this referrer in MyProjects, so
+  /// it stops casual reuse (other websites, quick scripts). Not real security:
+  /// the header ships in the APK.
+  static const String geoapifyReferer = 'https://nearby.syaheerdaniel.dev/';
+
+  /// Headers for every search, routing and tile request.
+  static Map<String, String> get httpHeaders => {
+        'User-Agent': httpUserAgent,
+        if (Env.useGeoapify) 'Referer': geoapifyReferer,
+      };
 }
 
 /// Matches `zones.trigger_type` in the database.

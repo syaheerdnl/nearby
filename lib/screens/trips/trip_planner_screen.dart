@@ -11,6 +11,7 @@ import '../../providers/zone_provider.dart';
 import '../../services/routing_service.dart';
 import '../../widgets/map_credit.dart';
 import '../shell/shell_nav.dart';
+import '../../widgets/app_tile_layer.dart';
 
 /// Pick saved places to visit, get the shortest order (or drag your own),
 /// see the route, then hand it to Google Maps for turn-by-turn.
@@ -303,10 +304,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                     onMapReady: () => _mapReady = true,
                   ),
                   children: [
-                    TileLayer(
-                      urlTemplate: AppConstants.tileUrl,
-                      userAgentPackageName: AppConstants.userAgentPackageName,
-                    ),
+                    const AppTileLayer(),
                     if (_route != null && _route!.path.length > 1)
                       PolylineLayer(polylines: [
                         Polyline(

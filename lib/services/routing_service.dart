@@ -113,7 +113,7 @@ class RoutingService {
       'apiKey': Env.geoapifyKey,
     });
     final res = await _client
-        .get(uri, headers: {'User-Agent': AppConstants.httpUserAgent})
+        .get(uri, headers: AppConstants.httpHeaders)
         .timeout(const Duration(seconds: 15));
     final json = _decode(res);
     final features = (json['features'] as List?) ?? const [];
@@ -153,7 +153,7 @@ class RoutingService {
               {'apiKey': Env.geoapifyKey}),
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': AppConstants.httpUserAgent,
+            ...AppConstants.httpHeaders,
           },
           body: jsonEncode({'mode': 'drive', 'sources': locs, 'targets': locs}),
         )
@@ -281,7 +281,7 @@ class RoutingService {
       String path, Map<String, String> query) async {
     final res = await _client
         .get(Uri.https(_host, path, query),
-            headers: {'User-Agent': AppConstants.httpUserAgent})
+            headers: AppConstants.httpHeaders)
         .timeout(const Duration(seconds: 15));
     Map<String, dynamic> json;
     try {

@@ -30,6 +30,7 @@ import '../lists/shared_list_screen.dart';
 import '../shell/shell_nav.dart';
 import 'zone_create_screen.dart';
 import 'zone_detail_screen.dart';
+import '../../widgets/app_tile_layer.dart';
 
 class ZoneMapScreen extends StatefulWidget {
   const ZoneMapScreen({super.key});
@@ -293,10 +294,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen>
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: AppConstants.tileUrl,
-                userAgentPackageName: AppConstants.userAgentPackageName,
-              ),
+              const AppTileLayer(),
               CircleLayer(
                 circles: [
                   for (final z in zones)

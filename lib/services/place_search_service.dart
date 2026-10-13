@@ -100,7 +100,7 @@ class PlaceSearchService {
 
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     final res = await _client
-        .get(uri, headers: {'User-Agent': AppConstants.httpUserAgent})
+        .get(uri, headers: AppConstants.httpHeaders)
         .timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) {
       throw PlaceSearchException('Search failed (${res.statusCode}).');
