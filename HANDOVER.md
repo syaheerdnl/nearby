@@ -1,6 +1,6 @@
 # Nearby — Handover (2026-10-13)
 
-TL;DR: Phase 1 + Phase 2 (friends, shared lists) are built and mostly tested on the emulator and the iQOO. The last change (shared pins on the map) is written but not built yet, and one Supabase hardening migration (005) needs its result confirmed.
+TL;DR: Phase 1 + Phase 2 (friends, shared lists, shared pins) are built and tested on the emulator (owner) and the iQOO (friend), live updates both ways. Open: confirm migration 005, unfriend test, friend arrival alert in the real world.
 
 Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (step-by-step log).
 
@@ -16,8 +16,8 @@ Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (st
 | Redesign: bottom tabs Home / Map / Trips / Profile | Done, tested |
 | "How often" (once) + active hours per place | Done, tested |
 | Friends (search, request, accept, WhatsApp invite text) | Done, tested on 2 accounts |
-| Shared lists (claim / bought, live updates, share View/Can buy, friend alerts) | Built + committed (e260e2d). Full 2-phone test not reported yet |
-| Shared places as pins on friend's Map | Written, NOT built yet (uncommitted: `lib/widgets/shared_pin_marker.dart`, `lib/screens/zones/zone_map_screen.dart`) |
+| Shared lists (claim / bought, live updates, share View/Can buy, friend alerts) | Done. 2-phone test 2026-10-13: add, claim, bought all live in ~3 s both ways. Friend arrival alert not yet tested |
+| Shared places as pins on friend's Map | Done, tested on iQOO. Tap opens list, long-press opens a details sheet (`widgets/shared_place_sheet.dart`). Hidden while a category filter is on |
 | Phase 3 (receipts, payments) | Not started. Empty placeholder files exist (`settlement/*`, `receipt.dart`, `payment_record.dart`, `list_provider.dart`, `add_friend_screen.dart`, `list_item_detail_screen.dart`, `claim_button.dart`, `permission_tier_selector.dart`) |
 
 ## 2. Do these first
@@ -28,8 +28,7 @@ Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (st
    select proname from pg_proc where proname in ('is_my_friend','are_friends');
    ```
    Expect the index and `is_my_friend` only (no `are_friends`). If not, re-run 005 (it's written to be re-runnable).
-2. Build, test the shared pins (friend account → Map tab), then commit.
-3. Full 2-phone shared-list test (see section 6).
+2. Unfriend test (needs 005), then the real-world friend arrival test (section 6).
 
 ## 3. Run it
 
@@ -72,16 +71,17 @@ RLS helpers are `SECURITY DEFINER` (owns_zone, owns_list, list_permission, zone_
 
 ## 6. Test checklist still open
 
-- [ ] Shared pins visible on friend's Map; tap opens list
-- [ ] Emulator (owner) creates list on a place, adds "Beras", "Telur x30", shares with test account as Can buy
-- [ ] iQOO (test account): Home shows "Shared with you"; claim item → owner sees "<name> buying" live
-- [ ] Friend arrival alert lists open items (iQOO alone on adb: `bash tools/geofence_test.sh home`)
+- [x] Shared pins visible on friend's Map; tap opens list; category filter hides them
+- [x] Emulator (owner) list "Barang Home" with Beras, Telur x30, Gula, shared with syaheerdaniel23 as Can buy
+- [x] iQOO (friend): Home shows "Shared with you"; claim / bought / owner adds all update live (~3 s)
+- [ ] Friend arrival alert lists open items. Needs the iQOO to physically arrive (geofence_test.sh only mocks emulator GPS, and the emulator is the owner account)
+- [ ] Check GMS "registration not permitted" warning on iQOO (logged on each reinstall/refresh for the 150 m Home fence; perms are granted, likely re-register noise). A real arrival settles it
 - [ ] Unfriend → friend loses the list (needs 005)
 - [ ] Real-world iQOO walk to a shared place
 
 ## 7. Known limits / decisions
 
-- Friend's alert shows open items as of their last app refresh (cached locally for offline alerts).
+- Friend's alert shows open items as of their last refresh (cached locally for offline alerts). Cache refreshes on app resume, Home pull-to-refresh, and on leaving a shared list.
 - Friends see only the owner + themselves in a list's member line (RLS hides other friends' access rows).
 - "View" shares don't get map pins or alerts; only "Can buy".
 - Distances on Home are straight-line (no API cost). Trip planner uses road times.
