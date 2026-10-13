@@ -49,3 +49,8 @@ config.json
 config.*.json
 tools/geofence_logs/
 _to_delete/
+
+# Release signing (never commit)
+android/key.properties
+*.jks
+*.keystore
