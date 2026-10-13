@@ -1,0 +1,3 @@
+# Copy to tools/geofence_places.txt (gitignored) and list your own saved
+# "arrive" places, one per line: name|lat|lng|radius
+Suria KLCC|3.158000|101.712300|150

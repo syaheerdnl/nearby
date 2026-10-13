@@ -4,7 +4,7 @@
 # the geofence and Nearby shows a notification. Prints PASS/FAIL + latency.
 #
 # Usage:  bash tools/geofence_test.sh            (both tests)
-#         bash tools/geofence_test.sh asrama     (one test)
+#         bash tools/geofence_test.sh <name>     (one test, matches place name)
 # Needs: emulator running, Nearby installed and signed in.
 
 set -u
@@ -12,10 +12,15 @@ PKG=com.syaheer.nearby
 ADB="${ADB:-$(command -v adb || echo "$HOME/Library/Android/sdk/platform-tools/adb")}"
 [ -x "$ADB" ] || { echo "adb not found. Set ADB=/path/to/adb"; exit 1; }
 
-# name|lat|lng|radius   (from your Supabase zones; both are "arrive" places)
-TESTS=(
-  "Suria KLCC|3.158000|101.712300|150"
-)
+# Places to test come from tools/geofence_places.txt (gitignored, it holds
+# real locations). Format: name|lat|lng|radius, see geofence_places.example.txt.
+PLACES_FILE="$(dirname "$0")/geofence_places.txt"
+[ -f "$PLACES_FILE" ] || PLACES_FILE="$(dirname "$0")/geofence_places.example.txt"
+TESTS=()
+while IFS= read -r line; do
+  case "$line" in ''|'#'*) continue ;; esac
+  TESTS+=("$line")
+done < "$PLACES_FILE"
 ONLY="${1:-}"
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }

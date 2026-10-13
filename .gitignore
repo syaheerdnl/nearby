@@ -54,3 +54,7 @@ _to_delete/
 android/key.properties
 *.jks
 *.keystore
+
+# Private notes and real locations (never commit)
+_SESSION_SUMMARY.md
+tools/geofence_places.txt
