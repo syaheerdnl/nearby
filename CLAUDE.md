@@ -1,5 +1,8 @@
 # CLAUDE.md — Build Instructions for Nearby
 
+> **Current state:** see `HANDOVER.md` (what's built, what's open, how to run/test) before starting work. Some details below changed during the build (e.g. Geoapify instead of public OSM servers, sqflite v4 schema, migrations 001-005).
+
+
 This file is the working brief for Claude Code. Read this in full before writing any code. Follow the build order strictly — do not jump ahead to Phase 2 or 3 features until Phase 1 is confirmed working.
 
 ---
