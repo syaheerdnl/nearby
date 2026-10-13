@@ -15,6 +15,33 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
   distance and time, then hand it off to Google Maps
 - Works offline. Everything is saved on the phone first and syncs to
   Supabase when there's a connection
+- Add friends by username and share a shopping list on a place. Friends who
+  can buy see it live, claim items, and get the alert when they pass by
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/01-home.png" width="220" alt="Home"></td>
+    <td><img src="docs/screenshots/02-map.png" width="220" alt="Map"></td>
+    <td><img src="docs/screenshots/03-card.png" width="220" alt="Place card"></td>
+  </tr>
+  <tr>
+    <td>Home: closest place and your list of places</td>
+    <td>Map: each place with its reminder area</td>
+    <td>Tap a pin to see and tick off reminders</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/04-place.png" width="220" alt="Place"></td>
+    <td><img src="docs/screenshots/05-list.png" width="220" alt="Shared list"></td>
+    <td><img src="docs/screenshots/06-trips.png" width="220" alt="Trip planner"></td>
+  </tr>
+  <tr>
+    <td>Place settings, reminders and its shared list</td>
+    <td>Shared list: a friend claims and buys items, updated live</td>
+    <td>Trip planner: shortest order across saved places</td>
+  </tr>
+</table>
 
 ## How it works
 
