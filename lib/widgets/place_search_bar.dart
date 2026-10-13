@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../core/constants.dart';
 import '../models/place_result.dart';
 import '../services/place_search_service.dart';
 
@@ -201,7 +202,10 @@ class _PlaceSearchBarState extends State<PlaceSearchBar> {
             alignment: Alignment.centerRight,
             child: Padding(
               padding: const EdgeInsets.only(top: 2, right: 8),
-              child: Text('Search by Photon · OpenStreetMap',
+              child: Text(
+                  Env.useGeoapify
+                      ? 'Powered by Geoapify · © OpenStreetMap contributors'
+                      : 'Search by Photon · OpenStreetMap',
                   style: theme.textTheme.labelSmall),
             ),
           ),

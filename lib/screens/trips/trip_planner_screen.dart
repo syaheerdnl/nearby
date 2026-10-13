@@ -36,6 +36,8 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
   bool _busy = false;
   String? _error;
   int _routeRequest = 0;
+  bool _locating = false;
+  bool _mapReady = false;
 
   @override
   void initState() {
@@ -102,15 +104,21 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
           perm != LocationPermission.whileInUse) {
         return;
       }
+      if (mounted) setState(() => _locating = true);
       final pos = await Geolocator.getCurrentPosition(
         locationSettings:
             const LocationSettings(accuracy: LocationAccuracy.high),
       );
       if (!mounted) return;
       setState(() => _start = LatLng(pos.latitude, pos.longitude));
+      // initialCenter only applies when the map is first built (often before
+      // any fix or saved places), so move it once we know where we are.
+      if (_stops.isEmpty && _mapReady) _map.move(_start!, 14);
       _refreshRoute();
     } catch (_) {
       // No fix: the first stop becomes the start.
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
   }
 
@@ -289,7 +297,11 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
               children: [
                 FlutterMap(
                   mapController: _map,
-                  options: MapOptions(initialCenter: center, initialZoom: 14),
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: 14,
+                    onMapReady: () => _mapReady = true,
+                  ),
                   children: [
                     TileLayer(
                       urlTemplate: AppConstants.tileUrl,
@@ -417,7 +429,7 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                         : ReorderableListView.builder(
                             buildDefaultDragHandles: false,
                             padding: const EdgeInsets.only(top: 6),
-                            header: _start == null
+                            header: _start == null && !_locating
                                 ? null
                                 : _TimelineRow(
                                     marker: Container(
@@ -430,7 +442,9 @@ class _TripPlannerScreenState extends State<TripPlannerScreen> {
                                       ),
                                     ),
                                     lineBelow: _stops.isNotEmpty,
-                                    title: 'You',
+                                    title: _start == null && _locating
+                                        ? 'Finding you...'
+                                        : 'You',
                                   ),
                             itemCount: _stops.length,
                             onReorder: (oldIndex, newIndex) {

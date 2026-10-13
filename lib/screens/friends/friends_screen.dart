@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/theme.dart';
 import '../../models/friend.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/friend_provider.dart';
@@ -247,8 +248,11 @@ class _InviteCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Card is light in both themes, so the title needs a
+                  // fixed dark colour (the theme default turns white in dark mode).
                   Text('Invite on WhatsApp',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, color: AppTheme.ink)),
                   Text('Sends your username so they can add you',
                       style: TextStyle(fontSize: 12, color: green)),
                 ],
