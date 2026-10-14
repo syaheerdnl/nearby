@@ -17,6 +17,9 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
   Supabase when there's a connection
 - Add friends by username and share a shopping list on a place. Friends who
   can buy see it live, claim items, and get the alert when they pass by
+- Settle up: whoever bought an item adds the receipt (photo and amount), the
+  list owner sees their bank details or DuitNow QR, pays in their own bank
+  app and marks it paid. Nearby never moves money, it only keeps track
 
 ## Demo
 
@@ -64,6 +67,12 @@ visit. No network call is needed at that point.
 Edits go into SQLite with a sync flag and get pushed to Supabase later.
 Pulls never overwrite a row that still has local changes waiting.
 
+Shared lists, receipts and payments live only on the server, guarded by row
+level security. Receipt photos and QR images sit in private Storage buckets
+and are shown through short-lived signed links. Bank details are readable by
+friends only. Marking a receipt paid settles the item inside the same
+database transaction, and a paid item can't be changed afterwards.
+
 ## Stack
 
 | Part | Used |
@@ -72,9 +81,10 @@ Pulls never overwrite a row that still has local changes waiting.
 | Map | flutter_map, Geoapify tiles (OpenStreetMap data) |
 | Geofencing | native_geofence |
 | Local storage | sqflite |
-| Backend | Supabase (Auth, Postgres, row level security) |
+| Backend | Supabase (Auth, Postgres, row level security, Realtime, Storage) |
 | Search / routing | Geoapify Autocomplete, Routing, Route Matrix |
 | Notifications | flutter_local_notifications |
+| Photos | image_picker (resized on the phone before upload) |
 
 ## Testing
 
