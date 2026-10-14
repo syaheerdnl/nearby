@@ -18,6 +18,16 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
 - Add friends by username and share a shopping list on a place. Friends who
   can buy see it live, claim items, and get the alert when they pass by
 
+## Demo
+
+[![Watch the Nearby demo (48 s)](docs/demo-poster.jpg)](https://github.com/syaheerdnl/nearby/releases/download/v1.0.2/nearby-demo.mp4)
+
+48 seconds: saving a place, the arrival alert, a shared list and the trip planner. Recorded on the Android emulator with a demo account.
+
+## Download
+
+Get the latest APK from [Releases](https://github.com/syaheerdnl/nearby/releases/latest). Android only.
+
 ## Screenshots
 
 <table>
