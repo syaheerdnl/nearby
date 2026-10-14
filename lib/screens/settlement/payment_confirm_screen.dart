@@ -123,9 +123,7 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
       if (mounted) {
         setState(() => _paying = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Couldn't save the payment. Check your connection."),
-          ),
+          SnackBar(content: Text(settlementErrorMessage(e, 'save the payment'))),
         );
       }
     }

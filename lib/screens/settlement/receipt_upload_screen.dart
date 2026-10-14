@@ -110,9 +110,7 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = e is SettlementException
-              ? e.message
-              : "Couldn't save the receipt. Check your connection and try again.";
+          _error = settlementErrorMessage(e, 'save the receipt');
         });
       }
     }

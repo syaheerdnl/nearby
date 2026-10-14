@@ -61,6 +61,7 @@ Migrations in `supabase/`, applied in order via the dashboard SQL editor. **Add-
 | 004_friends_lists.sql (friends, shared_lists, list_access, list_items, RLS helpers, realtime) | Applied, 4 tables verified with RLS |
 | 005_lists_hardening.sql (status-only accept, unfriend revokes access, item column grants + claim guard, `is_my_friend`, one list per zone) | Applied 2026-10-14 (re-run in a transaction), verified |
 | 006_receipts_payments.sql (receipts, payment_records, friends-only payment_details, settle trigger + settled guard, private buckets receipts / payment-qr) | Applied 2026-10-14 in a transaction, verified |
+| 007_fix_receipt_upload_policy.sql (qualify objects.name in the receipt photo upload policy; 006 always refused uploads) | Applied 2026-10-14, verified |
 
 RLS helpers are `SECURITY DEFINER` (owns_zone, owns_list, list_permission, zone_shared_with_me, is_my_friend) to avoid policy recursion between zones and shared_lists.
 

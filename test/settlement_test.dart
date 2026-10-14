@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nearby/models/list_item.dart';
 import 'package:nearby/models/payment_details.dart';
 import 'package:nearby/models/payment_record.dart';
 import 'package:nearby/models/receipt.dart';
+import 'package:nearby/services/settlement_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   group('parseAmountSen', () {
@@ -149,6 +153,37 @@ void main() {
     test('a bought item can still be reopened before it is paid', () {
       expect(ListItem.transition(item(ItemStatus.bought), ItemAction.reopen, 'owner'),
           {'status': 'open', 'claimed_by': null});
+    });
+  });
+
+  group('settlementErrorMessage', () {
+    test('only blames the connection for network errors', () {
+      expect(settlementErrorMessage(const SocketException('x'), 'save it'),
+          contains('Check your connection'));
+    });
+
+    test('a refusal from the server says so', () {
+      final rls = StorageException(
+          'new row violates row-level security policy',
+          statusCode: '403');
+      expect(settlementErrorMessage(rls, 'save the receipt'),
+          contains("not allowed"));
+      expect(settlementErrorMessage(rls, 'save the receipt'),
+          isNot(contains('connection')));
+      expect(
+          settlementErrorMessage(
+              const PostgrestException(message: 'denied', code: '42501'),
+              'save it'),
+          contains('not allowed'));
+    });
+
+    test('own validation messages pass through, others are generic', () {
+      expect(
+          settlementErrorMessage(
+              const SettlementException('Add a photo of the receipt.'), 'x'),
+          'Add a photo of the receipt.');
+      expect(settlementErrorMessage(Exception('boom'), 'save it'),
+          "Couldn't save it. Please try again.");
     });
   });
 }

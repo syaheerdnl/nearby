@@ -140,7 +140,7 @@ class _PaymentDetailsScreenState extends State<PaymentDetailsScreen> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = "Couldn't save. Check your connection and try again.";
+          _error = settlementErrorMessage(e, 'save your details');
         });
       }
     }

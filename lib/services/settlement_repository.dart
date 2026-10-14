@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -172,6 +174,26 @@ class SettlementRepository {
     'webp' => 'image/webp',
     _ => 'image/jpeg',
   };
+}
+
+/// A user-facing message for a failed [action] ("save the receipt"). Only
+/// blames the connection when it really was the network; a refusal from the
+/// server (RLS, 401/403) says so instead.
+String settlementErrorMessage(Object e, String action) {
+  if (e is SettlementException) return e.message;
+  if (e is SocketException || e is TimeoutException) {
+    return "Couldn't $action. Check your connection and try again.";
+  }
+  final code = switch (e) {
+    StorageException(:final statusCode) => statusCode,
+    PostgrestException(:final code) => code,
+    _ => null,
+  };
+  if (const {'401', '403', '42501'}.contains(code)) {
+    return "Couldn't $action: you're not allowed to do this anymore. "
+        'Go back and refresh the list.';
+  }
+  return "Couldn't $action. Please try again.";
 }
 
 class SettlementException implements Exception {
