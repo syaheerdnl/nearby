@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nearby/models/place_result.dart';
 import 'package:nearby/services/place_search_service.dart';
 import 'package:nearby/services/routing_service.dart';
 
@@ -34,7 +35,10 @@ double pathCost(List<List<double>> c, List<int> order) {
 }
 
 List<List<double>> randomMatrix(Random r, int n) => List.generate(
-    n, (i) => List.generate(n, (j) => i == j ? 0.0 : 60 + r.nextInt(1800).toDouble()));
+  n,
+  (i) =>
+      List.generate(n, (j) => i == j ? 0.0 : 60 + r.nextInt(1800).toDouble()),
+);
 
 void main() {
   group('RoutingService.exactOrder (shortest visiting order)', () {
@@ -52,8 +56,10 @@ void main() {
       for (var trial = 0; trial < 40; trial++) {
         final n = 3 + r.nextInt(5); // 2..6 stops
         final c = randomMatrix(r, n);
-        expect(pathCost(c, RoutingService.exactOrder(c)),
-            closeTo(bestCost(c), 1e-6));
+        expect(
+          pathCost(c, RoutingService.exactOrder(c)),
+          closeTo(bestCost(c), 1e-6),
+        );
       }
     });
 
@@ -61,7 +67,7 @@ void main() {
       // Start at 0 km, stops at 3, 1, 2 km along one road (seconds = km).
       final pos = [0.0, 3.0, 1.0, 2.0];
       final c = [
-        for (final a in pos) [for (final b in pos) (a - b).abs()]
+        for (final a in pos) [for (final b in pos) (a - b).abs()],
       ];
       expect(RoutingService.exactOrder(c), [1, 2, 0]);
     });
@@ -101,6 +107,42 @@ void main() {
     expect(pts.last.latitude, 2.37);
   });
 
+  group('PlaceSearchService.mergeResults (nearby first, then wider)', () {
+    PlaceResult r(String n, double la, double lo) =>
+        PlaceResult(name: n, subtitle: '', latitude: la, longitude: lo);
+
+    test('nearby results come first, wider ones fill the rest', () {
+      final out = PlaceSearchService.mergeResults(
+        [r('Pavilion Kuala Lumpur', 3.149, 101.713)],
+        [
+          r('Pavilion Park City', 5.31, 100.44),
+          r('Pavilion Erbil', 36.2, 44.0),
+        ],
+        8,
+      );
+      expect(out.map((e) => e.name), [
+        'Pavilion Kuala Lumpur',
+        'Pavilion Park City',
+        'Pavilion Erbil',
+      ]);
+    });
+
+    test('same place in both lists is shown once', () {
+      final out = PlaceSearchService.mergeResults(
+        [r('Jaya Grocer', 3.1601, 101.7190)],
+        [r('jaya grocer', 3.1603, 101.7192), r('Jaya Grocer', 3.07, 101.6)],
+        8,
+      );
+      expect(out.length, 2);
+      expect(out.first.latitude, 3.1601);
+    });
+
+    test('respects the limit', () {
+      final many = [for (var i = 0; i < 10; i++) r('P$i', i.toDouble(), 0)];
+      expect(PlaceSearchService.mergeResults(many, many, 4).length, 4);
+    });
+  });
+
   group('PlaceSearchService parsers', () {
     test('Geoapify autocomplete', () {
       final res = PlaceSearchService.parseGeoapify({
@@ -134,7 +176,7 @@ void main() {
         'features': [
           {
             'geometry': {
-              'coordinates': [102.25, 2.19]
+              'coordinates': [102.25, 2.19],
             },
             'properties': {
               'name': 'AEON Bandaraya Melaka',

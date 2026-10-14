@@ -32,17 +32,61 @@ class PlaceSearchService {
         : _photon(q, nearLat, nearLng, limit);
   }
 
+  /// Geoapify's proximity `bias` alone is weak (a search near KLCC for
+  /// "Pavilion" ranked Penang, Iraq and the UK first). So with a location we
+  /// ask for places within [nearbyRadiusM] first, and only widen to the
+  /// biased worldwide search when that finds fewer than [minNearby].
+  /// Usually 1 credit per search, 2 when little is nearby.
+  static const nearbyRadiusM = 50000;
+  static const minNearby = 3;
+
   Future<List<PlaceResult>> _geoapify(
-      String q, double? lat, double? lng, int limit) async {
-    final uri = Uri.https(_geoapifyHost, '/v1/geocode/autocomplete', {
+    String q,
+    double? lat,
+    double? lng,
+    int limit,
+  ) async {
+    Uri uri({
+      bool nearbyOnly = false,
+    }) => Uri.https(_geoapifyHost, '/v1/geocode/autocomplete', {
       'text': q,
       'limit': '$limit',
       'format': 'json',
-      if (lat != null && lng != null)
+      if (lat != null && lng != null) ...{
+        if (nearbyOnly)
+          'filter':
+              'circle:${lng.toStringAsFixed(5)},${lat.toStringAsFixed(5)},$nearbyRadiusM',
         'bias': 'proximity:${lng.toStringAsFixed(5)},${lat.toStringAsFixed(5)}',
+      },
       'apiKey': Env.geoapifyKey,
     });
-    return parseGeoapify(await _getJson(uri));
+
+    if (lat == null || lng == null) return parseGeoapify(await _getJson(uri()));
+
+    final nearby = parseGeoapify(await _getJson(uri(nearbyOnly: true)));
+    if (nearby.length >= minNearby) return nearby;
+    final wider = parseGeoapify(await _getJson(uri()));
+    return mergeResults(nearby, wider, limit);
+  }
+
+  /// [first] then [second], skipping places already listed (same name within
+  /// about 100 m), capped at [limit].
+  @visibleForTesting
+  static List<PlaceResult> mergeResults(
+    List<PlaceResult> first,
+    List<PlaceResult> second,
+    int limit,
+  ) {
+    String key(PlaceResult r) =>
+        '${r.name.toLowerCase()}|'
+        '${r.latitude.toStringAsFixed(3)},${r.longitude.toStringAsFixed(3)}';
+    final seen = <String>{};
+    final out = <PlaceResult>[];
+    for (final r in [...first, ...second]) {
+      if (out.length >= limit) break;
+      if (seen.add(key(r))) out.add(r);
+    }
+    return out;
   }
 
   /// Geoapify Autocomplete (format=json) body -> results.
@@ -64,18 +108,24 @@ class PlaceSearchService {
       if (subtitle.isEmpty || subtitle == name) {
         subtitle = [s('city'), s('state')].whereType<String>().join(', ');
       }
-      out.add(PlaceResult(
-        name: name,
-        subtitle: subtitle,
-        latitude: la.toDouble(),
-        longitude: lo.toDouble(),
-      ));
+      out.add(
+        PlaceResult(
+          name: name,
+          subtitle: subtitle,
+          latitude: la.toDouble(),
+          longitude: lo.toDouble(),
+        ),
+      );
     }
     return out;
   }
 
   Future<List<PlaceResult>> _photon(
-      String q, double? nearLat, double? nearLng, int limit) async {
+    String q,
+    double? nearLat,
+    double? nearLng,
+    int limit,
+  ) async {
     final uri = Uri.https(_photonHost, '/api/', {
       'q': q,
       'limit': '$limit',
@@ -114,7 +164,8 @@ class PlaceSearchService {
 
   static PlaceResult? _toResult(Map<String, dynamic> feature) {
     final coords = (feature['geometry'] as Map?)?['coordinates'] as List?;
-    final props = (feature['properties'] as Map?)?.cast<String, dynamic>() ??
+    final props =
+        (feature['properties'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
     if (coords == null || coords.length < 2) return null;
 
@@ -123,7 +174,10 @@ class PlaceSearchService {
       return v is String && v.trim().isNotEmpty ? v.trim() : null;
     }
 
-    final street = [s('housenumber'), s('street')].whereType<String>().join(' ');
+    final street = [
+      s('housenumber'),
+      s('street'),
+    ].whereType<String>().join(' ');
     final name = s('name') ?? (street.isNotEmpty ? street : null);
     if (name == null) return null;
     final parts = <String>[
