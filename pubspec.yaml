@@ -54,6 +54,7 @@ dependencies:
   # Place search (Photon) + routing (OSRM), and handing trips to Google Maps
   http: ^1.2.0
   url_launcher: ^6.3.0
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:

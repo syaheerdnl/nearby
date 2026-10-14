@@ -8,6 +8,7 @@ import '../../providers/zone_provider.dart';
 import '../../services/geofence_service.dart';
 import '../friends/friends_screen.dart';
 import '../onboarding/battery_optimization_screen.dart';
+import 'payment_details_screen.dart';
 
 /// Account and the settings that decide whether reminders actually fire.
 /// (Was the avatar menu on the map.)
@@ -125,6 +126,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             subtitle: 'Find people to share lists with',
             onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const FriendsScreen())),
+          ),
+          _Row(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Payment details',
+            subtitle: 'How friends pay you back',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const PaymentDetailsScreen())),
           ),
           const SizedBox(height: 14),
           Text('Reminders',

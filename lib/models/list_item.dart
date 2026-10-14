@@ -1,4 +1,5 @@
-/// `list_items.status`. `settled` is reserved for Phase 3 payments.
+/// `list_items.status`. `settled` means the owner paid the buyer back; it is
+/// final (the database rejects any change to a settled item).
 enum ItemStatus {
   open,
   claimed,
@@ -47,6 +48,7 @@ class ListItem {
   /// the action makes no sense from the current state.
   static Map<String, Object?>? transition(
       ListItem item, ItemAction action, String me) {
+    if (item.status == ItemStatus.settled) return null;
     switch (action) {
       case ItemAction.claim:
         if (item.status != ItemStatus.open) return null;

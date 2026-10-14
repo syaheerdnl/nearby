@@ -6,9 +6,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/list_access.dart';
 import '../../models/list_item.dart';
+import '../../models/payment_record.dart';
+import '../../models/receipt.dart';
 import '../../models/shared_list.dart';
 import '../../providers/zone_provider.dart';
 import '../../services/list_repository.dart';
+import '../../services/settlement_repository.dart';
+import '../settlement/payment_confirm_screen.dart';
+import '../settlement/receipt_upload_screen.dart';
 import 'share_list_screen.dart';
 
 /// One shared list, the same screen for the owner and for friends. Changes
@@ -23,6 +28,7 @@ class SharedListScreen extends StatefulWidget {
 
 class _SharedListScreenState extends State<SharedListScreen> {
   final _repo = ListRepository();
+  final _settle = SettlementRepository();
   final _add = TextEditingController();
   final _addFocus = FocusNode();
 
@@ -30,6 +36,9 @@ class _SharedListScreenState extends State<SharedListScreen> {
   List<ListItem> _items = const [];
   List<ListAccessEntry> _access = const [];
   Map<String, String> _names = {};
+  // Receipts by item id, payments by receipt id (Phase 3).
+  Map<String, Receipt> _receipts = const {};
+  Map<String, PaymentRecord> _payments = const {};
   String? _error;
   bool _loading = true;
   RealtimeChannel? _channel;
@@ -97,10 +106,23 @@ class _SharedListScreenState extends State<SharedListScreen> {
         ],
       }..removeAll(_names.keys);
       final names = ids.isEmpty ? const <String, String>{} : await _repo.names(ids);
+      // Receipts are optional extras: a failure here must not hide the list.
+      var receipts = _receipts;
+      var payments = _payments;
+      try {
+        receipts =
+            await _settle.receiptsFor(items.where((i) => i.isDone).map((i) => i.id));
+        payments =
+            await _settle.paymentsFor(receipts.values.map((r) => r.id));
+      } catch (e) {
+        debugPrint('Load receipts failed: $e');
+      }
       if (!mounted) return;
       setState(() {
         _items = items;
         _names = {..._names, ...names};
+        _receipts = receipts;
+        _payments = payments;
       });
     } catch (e) {
       debugPrint('Load items failed: $e');
@@ -142,27 +164,72 @@ class _SharedListScreenState extends State<SharedListScreen> {
     return _names[id] ?? '';
   }
 
+  /// Receipt screens push a route; reload when they report a change.
+  Future<void> _open(Widget screen) async {
+    final changed = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (_) => screen));
+    if (changed == true) await _loadItems();
+  }
+
   void _itemActions(ListItem item) {
     final list = _list;
-    if (list == null || !list.canEdit) return;
+    if (list == null) return;
     final me = _repo.me;
-    final actions = <(IconData, String, Future<void> Function())>[
+    final receipt = _receipts[item.id];
+    final paid = receipt == null ? null : _payments[receipt.id];
+    final buyer = _who(receipt?.uploadedBy ?? item.claimedBy);
+    // The owner buying their own item needs no receipt: nobody owes anybody.
+    final iBoughtForSomeone = item.status == ItemStatus.bought &&
+        item.claimedBy == me &&
+        !list.iOwn;
+    final canPay = receipt != null &&
+        paid == null &&
+        list.iOwn &&
+        receipt.uploadedBy != me;
+    final receiptActions = <_Action>[
+      if (iBoughtForSomeone && paid == null)
+        _Action.open(
+          Icons.receipt_long_outlined,
+          receipt == null ? 'Add receipt' : 'Edit receipt',
+          () => _open(ReceiptUploadScreen(item: item, existing: receipt)),
+        ),
+      if (receipt != null)
+        _Action.open(
+          canPay ? Icons.payments_outlined : Icons.receipt_outlined,
+          canPay ? 'Pay $buyer' : 'View receipt',
+          () => _open(PaymentConfirmScreen(
+                item: item,
+                receipt: receipt,
+                buyerName: buyer,
+                canPay: canPay,
+                payment: paid,
+              )),
+        ),
+    ];
+    if (!list.canEdit && receiptActions.isEmpty) return;
+    final settled = item.status == ItemStatus.settled;
+    final actions = <_Action>[
+      ...receiptActions,
+      if (list.canEdit && !settled) ...[
       if (item.status == ItemStatus.open)
-        (Icons.front_hand_outlined, "I'll buy this",
+        _Action(Icons.front_hand_outlined, "I'll buy this",
             () => _repo.apply(item, ItemAction.claim)),
       if (item.status == ItemStatus.claimed && item.claimedBy == me)
-        (Icons.undo, "I can't buy it after all",
+        _Action(Icons.undo, "I can't buy it after all",
             () => _repo.apply(item, ItemAction.unclaim)),
       if (!item.isDone)
-        (Icons.check_circle_outline, 'Bought',
+        _Action(Icons.check_circle_outline, 'Bought',
             () => _repo.apply(item, ItemAction.bought)),
-      // Skip when "I can't buy it after all" is shown: same result.
+      // Skip when "I can't buy it after all" is shown: same result. Not once
+      // a receipt is in: put the receipt right instead of reopening.
       if (item.status != ItemStatus.open &&
+          receipt == null &&
           !(item.status == ItemStatus.claimed && item.claimedBy == me))
-        (Icons.replay, 'Put back on the list',
+        _Action(Icons.replay, 'Put back on the list',
             () => _repo.apply(item, ItemAction.reopen)),
       if (list.iOwn || item.createdBy == me)
-        (Icons.delete_outline, 'Delete', () => _repo.deleteItem(item.id)),
+        _Action(Icons.delete_outline, 'Delete', () => _repo.deleteItem(item.id)),
+      ],
     ];
     showModalBottomSheet<void>(
       context: context,
@@ -176,13 +243,14 @@ class _SharedListScreenState extends State<SharedListScreen> {
               subtitle: item.quantity > 1 ? Text('x${item.quantity}') : null,
             ),
             const Divider(height: 1),
-            for (final (icon, label, run) in actions)
+            for (final a in actions)
               ListTile(
-                leading: Icon(icon),
-                title: Text(label),
+                leading: Icon(a.icon),
+                title: Text(a.label),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _run(run);
+                  // Opening a screen isn't a save: no error snackbar for it.
+                  a.opensScreen ? a.run() : _run(a.run);
                 },
               ),
           ],
@@ -293,7 +361,14 @@ class _SharedListScreenState extends State<SharedListScreen> {
                         _ItemRow(
                           item: i,
                           who: _who(i.claimedBy),
-                          onTap: list.canEdit ? () => _itemActions(i) : null,
+                          receipt: _receipts[i.id],
+                          payToMe: list.iOwn &&
+                              _receipts[i.id] != null &&
+                              _receipts[i.id]!.uploadedBy != _repo.me &&
+                              i.status != ItemStatus.settled,
+                          onTap: list.canEdit || _receipts[i.id] != null
+                              ? () => _itemActions(i)
+                              : null,
                         ),
                       if (list.canEdit) ...[
                         const SizedBox(height: 12),
@@ -317,6 +392,18 @@ class _SharedListScreenState extends State<SharedListScreen> {
   }
 }
 
+/// One entry in an item's action sheet.
+class _Action {
+  const _Action(this.icon, this.label, this.run) : opensScreen = false;
+  const _Action.open(this.icon, this.label, this.run) : opensScreen = true;
+  final IconData icon;
+  final String label;
+  final Future<void> Function() run;
+
+  /// Navigates to another screen instead of saving a change.
+  final bool opensScreen;
+}
+
 class _Members extends StatelessWidget {
   const _Members({required this.owner, required this.access, required this.myId});
   final String owner;
@@ -338,9 +425,19 @@ class _Members extends StatelessWidget {
 }
 
 class _ItemRow extends StatelessWidget {
-  const _ItemRow({required this.item, required this.who, this.onTap});
+  const _ItemRow({
+    required this.item,
+    required this.who,
+    this.receipt,
+    this.payToMe = false,
+    this.onTap,
+  });
   final ListItem item;
   final String who;
+  final Receipt? receipt;
+
+  /// I own the list and this receipt still needs paying.
+  final bool payToMe;
   final VoidCallback? onTap;
 
   @override
@@ -353,12 +450,18 @@ class _ItemRow extends StatelessWidget {
           const Color(0xFFFFF3E0),
           const Color(0xFFB45309)
         ),
-      _ => (
+      ItemStatus.bought => (
           who.isEmpty ? 'Bought' : '$who bought',
           const Color(0xFFE3F4EC),
           const Color(0xFF1F7A55)
         ),
+      ItemStatus.settled => (
+          'Paid',
+          scheme.surfaceContainerHighest,
+          scheme.onSurfaceVariant
+        ),
     };
+    final r = receipt;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -369,20 +472,54 @@ class _ItemRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text.rich(
-                TextSpan(children: [
-                  TextSpan(text: item.name),
-                  if (item.quantity > 1)
-                    TextSpan(
-                        text: '  x${item.quantity}',
-                        style: TextStyle(
-                            fontSize: 12.5, color: scheme.onSurfaceVariant)),
-                ]),
-                style: TextStyle(
-                  fontSize: 15,
-                  color: item.isDone ? scheme.onSurfaceVariant : null,
-                  decoration: item.isDone ? TextDecoration.lineThrough : null,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(text: item.name),
+                      if (item.quantity > 1)
+                        TextSpan(
+                            text: '  x${item.quantity}',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                color: scheme.onSurfaceVariant)),
+                    ]),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: item.isDone ? scheme.onSurfaceVariant : null,
+                      decoration:
+                          item.isDone ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (r != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Row(
+                        children: [
+                          Icon(Icons.receipt_long_outlined,
+                              size: 14,
+                              color: payToMe
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            payToMe
+                                ? '${formatSen(r.amountSen)} · tap to pay'
+                                : formatSen(r.amountSen),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight:
+                                  payToMe ? FontWeight.w600 : FontWeight.w400,
+                              color: payToMe
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
             Container(
