@@ -22,13 +22,8 @@ Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (st
 
 ## 2. Do these first
 
-1. **Confirm migration 005.** `supabase/005_lists_hardening.sql` was started in the Supabase SQL editor but the tab hung, so the result is unknown. Check with:
-   ```sql
-   select indexname from pg_indexes where indexname = 'shared_lists_zone_uidx';
-   select proname from pg_proc where proname in ('is_my_friend','are_friends');
-   ```
-   Expect the index and `is_my_friend` only (no `are_friends`). If not, re-run 005 (it's written to be re-runnable).
-2. Unfriend test (needs 005), then the real-world friend arrival test (section 6).
+1. Unfriend test (005 is now applied): unfriending must remove the friend's list access.
+2. Real-world arrival test on the iQOO (release build v1.0.2, battery exempt).
 
 ## 3. Run it
 
@@ -65,7 +60,7 @@ Migrations in `supabase/`, applied in order via the dashboard SQL editor. **Add-
 | 002_zone_category.sql | Applied |
 | 003_zone_schedule.sql (once_only, active_from/to) | Applied, verified |
 | 004_friends_lists.sql (friends, shared_lists, list_access, list_items, RLS helpers, realtime) | Applied, 4 tables verified with RLS |
-| 005_lists_hardening.sql (status-only accept, unfriend revokes access, item column grants + claim guard, `is_my_friend`, one list per zone) | **Unconfirmed** — see section 2 |
+| 005_lists_hardening.sql (status-only accept, unfriend revokes access, item column grants + claim guard, `is_my_friend`, one list per zone) | Applied 2026-10-14 (re-run in a transaction), verified |
 
 RLS helpers are `SECURITY DEFINER` (owns_zone, owns_list, list_permission, zone_shared_with_me, is_my_friend) to avoid policy recursion between zones and shared_lists.
 
