@@ -22,8 +22,7 @@ Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (st
 
 ## 2. Do these first
 
-1. Unfriend test (005 is now applied): unfriending must remove the friend's list access.
-2. Real-world arrival test on the iQOO (release build v1.0.2, battery exempt).
+1. Real-world arrival test on the iQOO (release build v1.0.2, battery exempt).
 
 ## 3. Run it
 
@@ -71,7 +70,7 @@ RLS helpers are `SECURITY DEFINER` (owns_zone, owns_list, list_permission, zone_
 - [x] iQOO (friend): Home shows "Shared with you"; claim / bought / owner adds all update live (~3 s)
 - [ ] Friend arrival alert lists open items. Needs the iQOO to physically arrive (geofence_test.sh only mocks emulator GPS, and the emulator is the owner account)
 - [ ] Check GMS "registration not permitted" warning on iQOO (logged on each reinstall/refresh for the 150 m Home fence; perms are granted, likely re-register noise). A real arrival settles it
-- [ ] Unfriend → friend loses the list (needs 005)
+- [x] Unfriend → friend loses the list (2026-10-14: aina removed hafiz, list_access 1 → 0 via friends_revoke_access trigger)
 - [ ] Real-world iQOO walk to a shared place
 
 ## 7. Known limits / decisions
