@@ -18,7 +18,7 @@ Read this first, then `CLAUDE.md` (original brief) and `_SESSION_SUMMARY.md` (st
 | Friends (search, request, accept, WhatsApp invite text) | Done, tested on 2 accounts |
 | Shared lists (claim / bought, live updates, share View/Can buy, friend alerts) | Done. 2-phone test 2026-10-13: add, claim, bought all live in ~3 s both ways. Friend arrival alert not yet tested |
 | Shared places as pins on friend's Map | Done, tested on iQOO. Tap opens list, long-press opens a details sheet (`widgets/shared_place_sheet.dart`). Hidden while a category filter is on |
-| Phase 3 (receipts, payments) | Not started. Empty placeholder files exist (`settlement/*`, `receipt.dart`, `payment_record.dart`, `list_provider.dart`, `add_friend_screen.dart`, `list_item_detail_screen.dart`, `claim_button.dart`, `permission_tier_selector.dart`) |
+| Phase 3 (receipts, payments) | Done, tested on 2 devices, released v1.1.0. Receipt photo + amount by the buyer, owner pays outside the app and marks paid (settles the item, final). Payment details in Profile, friends only. Unused placeholder files from the CLAUDE.md layout were removed (list state lives in the screens, claim/permission UI in the list and share screens) |
 
 ## 2. Do these first
 
@@ -76,6 +76,8 @@ RLS helpers are `SECURITY DEFINER` (owns_zone, owns_list, list_permission, zone_
 - [ ] Real-world iQOO walk to a shared place
 
 ## 7. Known limits / decisions
+
+- Build warning "plugins that apply Kotlin Gradle Plugin (KGP): native_geofence": not fixable on our side yet (checked 2026-10-15). native_geofence 1.3.1 (latest) already supports built-in Kotlin, but setting `android.builtInKotlin=true` breaks the build because `app_links` 7.2.2 (latest, pulled in by supabase_flutter) still applies KGP unconditionally. Retry when app_links updates.
 
 - Friend's alert shows open items as of their last refresh (cached locally for offline alerts). Cache refreshes on app resume, Home pull-to-refresh, and on leaving a shared list.
 - Friends see only the owner + themselves in a list's member line (RLS hides other friends' access rows).
