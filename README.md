@@ -56,6 +56,16 @@ Get the latest APK from [Releases](https://github.com/syaheerdnl/nearby/releases
     <td>Shared list: a friend claims and buys items, updated live</td>
     <td>Trip planner: shortest order across saved places</td>
   </tr>
+  <tr>
+    <td><img src="docs/screenshots/07-owe.png" width="220" alt="You owe card on a shared list"></td>
+    <td><img src="docs/screenshots/08-payall.png" width="220" alt="Pay all screen"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>You owe: what you owe each friend, from their receipts</td>
+    <td>Pay all: every receipt, the total and where to pay</td>
+    <td></td>
+  </tr>
 </table>
 
 ## How it works
