@@ -25,9 +25,9 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
 
 ## Demo
 
-[![Watch the Nearby demo (48 s)](docs/demo-poster.jpg)](https://github.com/syaheerdnl/nearby/releases/download/v1.0.2/nearby-demo.mp4)
+[![Watch the Nearby demo (57 s)](docs/demo-poster.jpg)](https://github.com/syaheerdnl/nearby/releases/download/v1.2.0/nearby-demo.mp4)
 
-48 seconds: saving a place, the arrival alert, a shared list and the trip planner. Recorded on the Android emulator with a demo account.
+57 seconds: saving a place, the arrival alert, a shared list, paying a friend back with Pay all, and the trip planner. Recorded on the Android emulator with a demo account.
 
 ## Download
 
