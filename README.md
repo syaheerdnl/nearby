@@ -20,6 +20,8 @@ and your phone tells you when you arrive. Built with Flutter and Supabase.
 - Settle up: whoever bought an item adds the receipt (photo and amount), the
   list owner sees their bank details or DuitNow QR, pays in their own bank
   app and marks it paid. Nearby never moves money, it only keeps track
+- Each shared list shows what you owe each friend, and Pay all settles all of
+  a friend's receipts in one go
 
 ## Demo
 
@@ -71,7 +73,9 @@ Shared lists, receipts and payments live only on the server, guarded by row
 level security. Receipt photos and QR images sit in private Storage buckets
 and are shown through short-lived signed links. Bank details are readable by
 friends only. Marking a receipt paid settles the item inside the same
-database transaction, and a paid item can't be changed afterwards.
+database transaction, and a paid item can't be changed afterwards. Pay all
+records every receipt in a single insert, so either all of them are paid or
+none are.
 
 ## Stack
 
