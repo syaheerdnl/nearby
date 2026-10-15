@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nearby/models/list_item.dart';
+import 'package:nearby/models/owed.dart';
 import 'package:nearby/models/payment_details.dart';
 import 'package:nearby/models/payment_record.dart';
 import 'package:nearby/models/receipt.dart';
@@ -184,6 +185,108 @@ void main() {
           'Add a photo of the receipt.');
       expect(settlementErrorMessage(Exception('boom'), 'save it'),
           "Couldn't save it. Please try again.");
+    });
+  });
+
+  group('owedByPerson (You owe / Pay all)', () {
+    ListItem item(String id, ItemStatus st, String by) => ListItem(
+          id: id,
+          listId: 'l1',
+          name: 'Item $id',
+          quantity: 1,
+          status: st,
+          createdBy: 'owner',
+          claimedBy: by,
+        );
+    Receipt receipt(String id, String itemId, String by, int sen) =>
+        Receipt.fromRow({
+          'id': id,
+          'list_item_id': itemId,
+          'uploaded_by': by,
+          'image_url': 'x.jpg',
+          'amount': senToNumeric(sen),
+          'created_at': '2026-10-15T01:00:00Z',
+        });
+    PaymentRecord payment(String receiptId) => PaymentRecord.fromRow({
+          'id': 'p-$receiptId',
+          'receipt_id': receiptId,
+          'payer_id': 'owner',
+          'payee_id': 'x',
+          'settled_at': '2026-10-15T02:00:00Z',
+        });
+
+    final items = [
+      item('1', ItemStatus.bought, 'ali'),
+      item('2', ItemStatus.bought, 'ali'),
+      item('3', ItemStatus.bought, 'siti'),
+      item('4', ItemStatus.settled, 'ali'),
+      item('5', ItemStatus.bought, 'ali'), // bought, no receipt yet
+      item('6', ItemStatus.bought, 'owner'), // owner bought it themselves
+    ];
+    final receipts = {
+      '1': receipt('r1', '1', 'ali', 1250),
+      '2': receipt('r2', '2', 'ali', 1210),
+      '3': receipt('r3', '3', 'siti', 790),
+      '4': receipt('r4', '4', 'ali', 5000),
+      '6': receipt('r6', '6', 'owner', 300),
+    };
+
+    test('owner: one group per friend, unpaid receipts only, largest first',
+        () {
+      final g = owedByPerson(
+        items: items,
+        receipts: receipts,
+        payments: {'r4': payment('r4')},
+        me: 'owner',
+        iOwn: true,
+        ownerId: 'owner',
+      );
+      expect(g.map((e) => e.personId), ['ali', 'siti']);
+      expect(g.first.totalSen, 2460); // 12.50 + 12.10, exact
+      expect(g.first.entries.map((e) => e.item.id), ['1', '2']);
+      expect(g.last.totalSen, 790);
+    });
+
+    test('a payment, or settled status, takes a receipt out', () {
+      final g = owedByPerson(
+        items: items,
+        receipts: receipts,
+        payments: {'r1': payment('r1')},
+        me: 'owner',
+        iOwn: true,
+        ownerId: 'owner',
+      );
+      expect(g.first.entries.map((e) => e.item.id), ['2']);
+      // r4 has no payment row here but its item is settled: not owed.
+      expect(g.expand((e) => e.entries).any((e) => e.item.id == '4'), isFalse);
+    });
+
+    test('friend: only my own receipts, grouped under the owner', () {
+      final g = owedByPerson(
+        items: items,
+        receipts: receipts,
+        payments: const {},
+        me: 'ali',
+        iOwn: false,
+        ownerId: 'owner',
+      );
+      expect(g.length, 1);
+      expect(g.single.personId, 'owner');
+      expect(g.single.totalSen, 2460);
+    });
+
+    test('nothing owed: empty, so the card hides', () {
+      expect(
+        owedByPerson(
+          items: items,
+          receipts: receipts,
+          payments: const {},
+          me: 'nobody',
+          iOwn: false,
+          ownerId: 'owner',
+        ),
+        isEmpty,
+      );
     });
   });
 }

@@ -101,18 +101,32 @@ class SettlementRepository {
     // sends an UPDATE event, so the owner's open list shows the receipt live.
     await supabase
         .from('list_items')
-        .update({'status': ItemStatus.bought.name}).eq('id', item.id);
+        .update({'status': ItemStatus.bought.name})
+        .eq('id', item.id);
   }
 
   /// Records that I (the list owner) paid the buyer. The database settles the
   /// item in the same transaction, and the record can't be changed after.
   Future<void> markPaid(Receipt receipt, {PaymentMethod? method}) =>
-      supabase.from('payment_records').insert({
-        'receipt_id': receipt.id,
-        'payer_id': me,
-        'payee_id': receipt.uploadedBy,
-        'method': method?.name,
-      });
+      markAllPaid([receipt], method: method);
+
+  /// Pays several receipts at once (Pay all). One insert is one SQL
+  /// statement, so either every item ends up paid or none do.
+  Future<void> markAllPaid(
+    List<Receipt> receipts, {
+    PaymentMethod? method,
+  }) async {
+    if (receipts.isEmpty) return;
+    await supabase.from('payment_records').insert([
+      for (final r in receipts)
+        {
+          'receipt_id': r.id,
+          'payer_id': me,
+          'payee_id': r.uploadedBy,
+          'method': method?.name,
+        },
+    ]);
+  }
 
   /// A link to show a receipt photo, valid for 10 minutes.
   Future<String> receiptPhotoUrl(Receipt r) =>

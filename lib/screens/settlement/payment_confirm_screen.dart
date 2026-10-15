@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../models/list_item.dart';
+import '../../models/owed.dart';
 import '../../models/payment_details.dart';
 import '../../models/payment_record.dart';
 import '../../models/receipt.dart';
 import '../../services/settlement_repository.dart';
 
-/// A receipt and how to pay it back. The list owner pays in their own bank
-/// app, then marks it paid here (final). Everyone else sees it read-only.
+/// One or more receipts from the same buyer and how to pay them back. The
+/// list owner pays in their own bank app, then marks them paid here (final;
+/// several at once is "Pay all"). Everyone else sees it read-only.
 /// Pops `true` after a payment is recorded.
 class PaymentConfirmScreen extends StatefulWidget {
   const PaymentConfirmScreen({
     super.key,
-    required this.item,
-    required this.receipt,
+    required this.entries,
     required this.buyerName,
     required this.canPay,
     this.payment,
-  });
+  }) : assert(entries.length > 0);
 
-  final ListItem item;
-  final Receipt receipt;
+  /// All from the same buyer ([Receipt.uploadedBy]).
+  final List<OwedEntry> entries;
   final String buyerName;
 
   /// I own the list, the buyer is someone else, and it isn't paid yet.
   final bool canPay;
+
+  /// Only for a single receipt that's already paid (shown read-only).
   final PaymentRecord? payment;
 
   @override
@@ -35,7 +37,8 @@ class PaymentConfirmScreen extends StatefulWidget {
 class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
   final _repo = SettlementRepository();
 
-  String? _photoUrl;
+  /// Signed photo link per receipt id.
+  Map<String, String> _photoUrls = const {};
   PaymentDetails? _details;
   String? _qrUrl;
   bool _loading = true;
@@ -55,18 +58,23 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
       _loadError = null;
     });
     try {
-      final photo = await _repo.receiptPhotoUrl(widget.receipt);
+      final photos = <String, String>{};
+      for (final e in widget.entries) {
+        photos[e.receipt.id] = await _repo.receiptPhotoUrl(e.receipt);
+      }
       PaymentDetails? details;
       String? qr;
       if (widget.canPay) {
-        details = await _repo.paymentDetails(widget.receipt.uploadedBy);
+        details = await _repo.paymentDetails(
+          widget.entries.first.receipt.uploadedBy,
+        );
         if (details != null && details.hasQr) {
           qr = await _repo.qrUrl(details.qrPath!);
         }
       }
       if (!mounted) return;
       setState(() {
-        _photoUrl = photo;
+        _photoUrls = photos;
         _details = details;
         _qrUrl = qr;
         _method = details == null
@@ -81,8 +89,7 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
       debugPrint('Load payment screen failed: $e');
       if (mounted) {
         setState(
-          () => _loadError =
-              "Couldn't load the receipt. Check your connection and try again.",
+          () => _loadError = settlementErrorMessage(e, 'load the receipt'),
         );
       }
     } finally {
@@ -90,12 +97,18 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
     }
   }
 
+  int get _totalSen =>
+      widget.entries.fold(0, (sum, e) => sum + e.receipt.amountSen);
+
   Future<void> _markPaid() async {
-    final amount = formatSen(widget.receipt.amountSen);
+    final amount = formatSen(_totalSen);
+    final n = widget.entries.length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Mark $amount as paid?'),
+        title: Text(
+          n == 1 ? 'Mark $amount as paid?' : 'Mark $amount ($n items) as paid?',
+        ),
         content: Text(
           'Only do this after the money has gone to ${widget.buyerName}. '
           "It can't be undone.",
@@ -108,7 +121,7 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Mark as paid'),
+            child: Text(n == 1 ? 'Mark as paid' : 'Mark all as paid'),
           ),
         ],
       ),
@@ -116,14 +129,18 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
     if (ok != true || !mounted) return;
     setState(() => _paying = true);
     try {
-      await _repo.markPaid(widget.receipt, method: _method);
+      await _repo.markAllPaid([
+        for (final e in widget.entries) e.receipt,
+      ], method: _method);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       debugPrint('Mark paid failed: $e');
       if (mounted) {
         setState(() => _paying = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(settlementErrorMessage(e, 'save the payment'))),
+          SnackBar(
+            content: Text(settlementErrorMessage(e, 'save the payment')),
+          ),
         );
       }
     }
@@ -157,8 +174,8 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final r = widget.receipt;
-    final paid = widget.payment;
+    final single = widget.entries.length == 1;
+    final paid = single ? widget.payment : null;
     final title = widget.canPay ? 'Pay ${widget.buyerName}' : 'Receipt';
 
     return Scaffold(
@@ -186,77 +203,10 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
                 children: [
-                  Text(
-                    widget.item.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: _photoUrl == null
-                            ? null
-                            : () => _openPhoto(_photoUrl!),
-                        child: Container(
-                          width: 112,
-                          height: 150,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: scheme.outlineVariant),
-                          ),
-                          child: _photoUrl == null
-                              ? const Icon(Icons.receipt_long_outlined)
-                              : Image.network(
-                                  _photoUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      const Icon(Icons.broken_image_outlined),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              formatSen(r.amountSen),
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Bought by ${widget.buyerName}',
-                              style: TextStyle(color: scheme.onSurfaceVariant),
-                            ),
-                            Text(
-                              _date(r.createdAt),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Tap the photo to zoom',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  if (single)
+                    ..._single(scheme, widget.entries.first)
+                  else
+                    ..._many(scheme),
                   const SizedBox(height: 20),
                   if (paid != null)
                     _Banner(
@@ -303,7 +253,7 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
                                 strokeWidth: 2.4,
                               ),
                             )
-                          : const Text('Mark as paid'),
+                          : Text(single ? 'Mark as paid' : 'Mark all as paid'),
                     ),
                   ],
                 ],
@@ -311,6 +261,138 @@ class _PaymentConfirmScreenState extends State<PaymentConfirmScreen> {
             ),
     );
   }
+
+  Widget _photo(ColorScheme scheme, String receiptId, double w, double h) {
+    final url = _photoUrls[receiptId];
+    return GestureDetector(
+      onTap: url == null ? null : () => _openPhoto(url),
+      child: Container(
+        width: w,
+        height: h,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(w < 80 ? 8 : 12),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: url == null
+            ? const Icon(Icons.receipt_long_outlined)
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    const Icon(Icons.broken_image_outlined),
+              ),
+      ),
+    );
+  }
+
+  List<Widget> _single(ColorScheme scheme, OwedEntry e) => [
+    Text(
+      e.item.name,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+    ),
+    const SizedBox(height: 12),
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _photo(scheme, e.receipt.id, 112, 150),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formatSen(e.receipt.amountSen),
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bought by ${widget.buyerName}',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              Text(
+                _date(e.receipt.createdAt),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tap the photo to zoom',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ];
+
+  /// Pay all: one row per receipt, then the total.
+  List<Widget> _many(ColorScheme scheme) => [
+    Text(
+      '${widget.entries.length} items bought by ${widget.buyerName}',
+      style: TextStyle(color: scheme.onSurfaceVariant),
+    ),
+    const SizedBox(height: 8),
+    for (final e in widget.entries)
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        ),
+        child: Row(
+          children: [
+            _photo(scheme, e.receipt.id, 44, 58),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.item.name, style: const TextStyle(fontSize: 15)),
+                  Text(
+                    _date(e.receipt.createdAt),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              formatSen(e.receipt.amountSen),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    const SizedBox(height: 10),
+    Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Total',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Text(
+          formatSen(_totalSen),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
+    const SizedBox(height: 4),
+    Text(
+      'Tap a photo to zoom',
+      style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+    ),
+  ];
 
   List<Widget> _payTo(ColorScheme scheme) {
     final d = _details;

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/list_access.dart';
 import '../../models/list_item.dart';
+import '../../models/owed.dart';
 import '../../models/payment_record.dart';
 import '../../models/receipt.dart';
 import '../../models/shared_list.dart';
@@ -171,6 +172,22 @@ class _SharedListScreenState extends State<SharedListScreen> {
     if (changed == true) await _loadItems();
   }
 
+  /// Display name for someone on this list (the owner's name comes with
+  /// the list, everyone else's from the items).
+  String _nameOf(String id) {
+    final list = _list;
+    if (list != null && id == list.ownerId) {
+      return id == _repo.me ? 'You' : list.ownerName;
+    }
+    return _who(id);
+  }
+
+  void _payAll(OwedGroup g) => _open(PaymentConfirmScreen(
+        entries: g.entries,
+        buyerName: _nameOf(g.personId),
+        canPay: true,
+      ));
+
   void _itemActions(ListItem item) {
     final list = _list;
     if (list == null) return;
@@ -198,8 +215,7 @@ class _SharedListScreenState extends State<SharedListScreen> {
           canPay ? Icons.payments_outlined : Icons.receipt_outlined,
           canPay ? 'Pay $buyer' : 'View receipt',
           () => _open(PaymentConfirmScreen(
-                item: item,
-                receipt: receipt,
+                entries: [(item: item, receipt: receipt)],
                 buyerName: buyer,
                 canPay: canPay,
                 payment: paid,
@@ -350,6 +366,19 @@ class _SharedListScreenState extends State<SharedListScreen> {
                                   color: scheme.onSurfaceVariant)),
                         ),
                       const SizedBox(height: 8),
+                      _OwedCard(
+                        groups: owedByPerson(
+                          items: _items,
+                          receipts: _receipts,
+                          payments: _payments,
+                          me: _repo.me,
+                          iOwn: list.iOwn,
+                          ownerId: list.ownerId,
+                        ),
+                        iOwn: list.iOwn,
+                        nameOf: _nameOf,
+                        onPay: _payAll,
+                      ),
                       if (_items.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -402,6 +431,90 @@ class _Action {
 
   /// Navigates to another screen instead of saving a change.
   final bool opensScreen;
+}
+
+/// Money still to settle on this list. As the owner: one row per friend you
+/// owe, each with Pay / Pay all. As a friend: what the owner owes you.
+/// Hidden when nothing is owed.
+class _OwedCard extends StatelessWidget {
+  const _OwedCard({
+    required this.groups,
+    required this.iOwn,
+    required this.nameOf,
+    required this.onPay,
+  });
+  final List<OwedGroup> groups;
+  final bool iOwn;
+  final String Function(String id) nameOf;
+  final void Function(OwedGroup g) onPay;
+
+  @override
+  Widget build(BuildContext context) {
+    if (groups.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    String items(int n) => n == 1 ? '1 item' : '$n items';
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (iOwn)
+            Text('You owe',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurfaceVariant)),
+          for (final g in groups)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          iOwn
+                              ? nameOf(g.personId)
+                              : '${nameOf(g.personId)} owes you',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          iOwn
+                              ? items(g.entries.length)
+                              : '${items(g.entries.length)} · waiting for '
+                                  'them to pay',
+                          style: TextStyle(
+                              fontSize: 12.5, color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(formatSen(g.totalSen),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  if (iOwn) ...[
+                    const SizedBox(width: 6),
+                    TextButton(
+                      onPressed: () => onPay(g),
+                      child: Text(g.entries.length == 1 ? 'Pay' : 'Pay all'),
+                    ),
+                  ] else
+                    const SizedBox(width: 6),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Members extends StatelessWidget {
