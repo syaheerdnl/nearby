@@ -1,4 +1,4 @@
-# Nearby — Handover (2026-10-13)
+# Nearby, handover (updated 2026-10-15)
 
 TL;DR: Phase 1 + Phase 2 (friends, shared lists, shared pins) are built and tested on the emulator (owner) and the iQOO (friend), live updates both ways. Open: confirm migration 005, unfriend test, friend arrival alert in the real world.
 
